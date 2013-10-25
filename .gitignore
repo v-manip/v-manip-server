@@ -1,0 +1,7 @@
+# Python
+*.pyc
+
+# Django
+/V_MANIP_Server.egg-info
+
+# Custom
