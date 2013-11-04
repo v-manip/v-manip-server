@@ -47,7 +47,10 @@ class W3DSGetTileHandler(Component):
     request = "GetTile"
 
     def handle(self, request):
-        # request is a Django HTTPRequest object
+
+        return """Response for GetTile Request"""
+
+        '''# request is a Django HTTPRequest object
 
         if error:
             raise Exception() # should be passed to the exceptionhandler
@@ -77,4 +80,4 @@ class W3DSGetTileKVPDecoder(kvp.Decoder):
     tilelevel = kvp.Parameter(type=int)
     tilerow = kvp.Parameter(type=int)
     tilecol = kvp.Parameter(type=int)
-
+    '''

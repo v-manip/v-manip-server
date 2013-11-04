@@ -28,13 +28,17 @@
 
 
 
-class X3DSceneRenderer(Component):
+"""class X3DSceneRenderer(Component):
 	implements(SceneRendererInterface)
 
 	formats = ["x3d", "application/x3d"]
 
 	def render_scene(self, coverages, parameters):
 
+		return None
+
+		'''
+		#Pseudocode
 		scene = Scene()
 		for coverage in coverages:
             # transform data to mesh
@@ -42,4 +46,5 @@ class X3DSceneRenderer(Component):
             # add mesh to "scene"
             scene.append(mesh)
 
-        return self.encode_x3d(scene)
+        return self.encode_x3d(scene)'''
+"""

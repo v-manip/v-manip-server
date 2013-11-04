@@ -10,6 +10,9 @@ from eoxserver.services.ows.interfaces import (
 )
 
 
+from vmanip_server.mesh_factory.ows.w3ds.interfaces import SceneRendererInterface
+
+
 # handler definition
 
 
@@ -24,6 +27,11 @@ class W3DSGetSceneHandler(Component):
     request = "GetScene"
 
     def handle(self, request):
+
+        return """Response for GetScene Request"""
+
+        '''
+        # Pseudocode
         # request is a Django HTTPRequest object
 
         if error:
@@ -73,4 +81,6 @@ class W3DSGetSceneKVPDecoder(kvp.Decoder):
     crs = kvp.Parameter()
     layers = kvp.Parameter(type=typelist(",", str))
     # look at getscene parameter
+
+    '''
 
