@@ -33,7 +33,10 @@ from eoxserver.core.decoders import kvp
 from eoxserver.services.ows.interfaces import (
     ServiceHandlerInterface, GetServiceHandlerInterface
 )
+from django.http import HttpResponse
+import json
 
+import os
 
 # handler definition
 
@@ -43,12 +46,20 @@ class W3DSGetTileHandler(Component):
     implements(GetServiceHandlerInterface)
 
     service = "W3DS"
-    versions = ["1.0"]
+    versions = ["0.4.0"]
     request = "GetTile"
 
     def handle(self, request):
+        # FIXXME: retrieve model.json from cache!
+        json_data = open('static/model.json')
+        data = json.load(json_data) # deserialize it
+        json_data.close()
 
-        return """Response for GetTile Request"""
+        # response = HttpResponse(json.dumps(data), content_type='application/json')
+        # response['Content-Disposition'] = 'attachment; filename="model.json"'     
+        # return response
+
+        return (json.dumps(data), 'application/json');
 
         '''# request is a Django HTTPRequest object
 
