@@ -33,13 +33,20 @@ from eoxserver.core.decoders import kvp
 from eoxserver.services.ows.interfaces import (
     ServiceHandlerInterface, GetServiceHandlerInterface
 )
+from vmanip_server.mesh_cache import models
 from django.http import HttpResponse
 import json
 
-import os
+# KVP decoder
+
+class W3DSGetTileKVPDecoder(kvp.Decoder):
+    crs = kvp.Parameter()
+    layer = kvp.Parameter()
+    tilelevel = kvp.Parameter(type=int)
+    tilerow = kvp.Parameter(type=int)
+    tilecol = kvp.Parameter(type=int)
 
 # handler definition
-
 
 class W3DSGetTileHandler(Component):
     implements(ServiceHandlerInterface)
@@ -50,16 +57,121 @@ class W3DSGetTileHandler(Component):
     request = "GetTile"
 
     def handle(self, request):
-        # FIXXME: retrieve model.json from cache!
-        json_data = open('static/model.json')
+        data = self.lookup_cache('adm_aeolus', 1, 0, 0)
+
+        # FIXXME: error handling
+        # if not data:
+        #   self.handleError()
+        
+        return (json.dumps(data), 'application/json');
+
+    def loadJSONFromFile(self, filename):
+        # json_data = open('static/answer.json')
+        json_data = open(filename)
         data = json.load(json_data) # deserialize it
         json_data.close()
+        return data
 
-        # response = HttpResponse(json.dumps(data), content_type='application/json')
-        # response['Content-Disposition'] = 'attachment; filename="model.json"'     
-        # return response
+    def lookup_cache(self, layer_name, tilelevel_value, tilecol_value, tilerow_value):
+        tilerow = None
 
-        return (json.dumps(data), 'application/json');
+        print 'Handling: ' + layer_name + '/' + str(tilelevel_value) + '/' + str(tilecol_value) + '/' + str(tilerow_value)
+
+        # FIXXME: When a layer is created for the first time it can be created multiple times, because
+        # the WebClient sends 4 parallel requests. The 'result' will be 0 for each of the 4 requests, therefore
+        # the new layer will get created in the database 4 times.
+        # The current workaround is to manually create the layer table upfront, but this has to be fixed!          
+        layer_query = models.Layer.objects.filter(name=layer_name);
+
+        if len(layer_query):
+            print 'Found layer: ' + layer_name
+            if len(layer_query) != 1:
+                print 'Error! There should only be one entry for each layer!'
+            layer = layer_query[0]
+
+            tilelevel_query = models.TileLevel.objects.filter(layer=layer.id, value=tilelevel_value);
+            if len(tilelevel_query):
+                print '0'
+                print 'Found level: ' + str(tilelevel_value) + ' for layer ' + layer_name
+                if len(layer_query) != 1:
+                    print 'Error! There should only be one entry for each level!'
+                tilelevel = tilelevel_query[0]
+
+                tilecol_query = models.TileCol.objects.filter(tilelevel=tilelevel.id, value=tilecol_value);
+                if len(tilecol_query):
+                    print '1'
+                    print 'Found tilecol: ' + str(tilecol_value) + ' for level ' + str(tilelevel_value)
+                    if len(tilecol_query) != 1:
+                        print 'Error! There should only be one entry for each tilecol!'
+                    tilecol = tilecol_query[0]
+                    
+                    tilerow_query = models.TileRow.objects.filter(tilecol=tilecol.id, value=tilerow_value);
+                    if len(tilerow_query):
+                        print '2'
+                        print 'Found tilerow: ' + str(tilerow_value) + ' for col ' + str(tilecol_value)
+                        if len(tilerow_query) != 1:
+                            print 'Error! There should only be one entry for each tilerow!'
+                        tilerow = tilerow_query[0]
+                else:
+                    tilerow = self.create_tilecol_record(tilelevel, tilecol_value, tilerow_value)
+                    print '3'                    
+                    print 'Created tilerow record for: ' + str(tilerow_value)
+            else:
+                tilerow = self.create_tilelevel_record(layer, tilelevel_value, tilecol_value, tilerow_value)
+                print '4'
+                print 'Created tilelevel record for: ' + str(tilelevel_value)
+        else:
+            tilerow = self.create_layer_record(layer_name, tilelevel_value, tilerow_value, tilecol_value)
+            print '5'
+            print 'Created layer record for: ' + layer_name
+
+            print 'tilerow:'
+            print tilerow
+
+        #print 'tilerow_content: ' + tilerow.content_file
+
+        #content = self.loadJSONFromFile(tilerow.content_file)
+        #return content
+        return "asdf"
+
+    def create_layer_record(self, layer_name, tilelevel_value, tilecol_value, tilerow_value):
+        layer = models.Layer.objects.create(name=layer_name)
+        tilelevel = models.TileLevel.objects.create(layer=layer, value=tilelevel_value)
+        tilecol = models.TileCol.objects.create(tilelevel=tilelevel, value=tilecol_value)
+        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value)
+
+        # FIXXME: Request from MeshFactory!
+        tilerow.content_file = 'models/curtain_test/answer.json'
+
+        return tilerow
+
+    def create_tilelevel_record(self, layer, tilelevel_value, tilecol_value, tilerow_value):
+        tilelevel = models.TileLevel.objects.create(layer=layer, value=tilelevel_value)
+        tilecol = models.TileCol.objects.create(tilelevel=tilelevel, value=tilecol_value)
+        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value)
+
+        # FIXXME: Request from MeshFactory!
+        tilerow.content_file = 'models/curtain_test/answer.json'
+
+        return tilerow
+
+    def create_tilecol_record(self, tilelevel, tilecol_value, tilerow_value):
+        tilecol = models.TileCol.objects.create(tilelevel=tilelevel, value=tilecol_value)
+        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value)
+
+        # FIXXME: Request from MeshFactory!
+        tilerow.content_file = 'models/curtain_test/answer.json'
+
+        return tilerow
+
+    def create_tilerow_record(self, tilecol, tilerow_value):
+        tilecol = models.TileCol.objects.create(tilelevel=tilelevel, value=tilecol_value)
+        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value)
+
+        # FIXXME: Request from MeshFactory!
+        tilerow.content_file = 'models/curtain_test/answer.json'
+
+        return tilerow
 
         '''# request is a Django HTTPRequest object
 
@@ -83,12 +195,4 @@ class W3DSGetTileHandler(Component):
             
 
         return response 
-
-
-class W3DSGetTileKVPDecoder(kvp.Decoder):
-    crs = kvp.Parameter()
-    layer = kvp.Parameter()
-    tilelevel = kvp.Parameter(type=int)
-    tilerow = kvp.Parameter(type=int)
-    tilecol = kvp.Parameter(type=int)
     '''

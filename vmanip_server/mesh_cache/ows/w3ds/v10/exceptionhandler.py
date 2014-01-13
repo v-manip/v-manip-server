@@ -35,7 +35,7 @@ class W3DSExceptionHandler(Component):
     implements(ExceptionHandlerInterface)
 
     service = "W3DS"
-    versions = ["1.0", "1.0.0"]
+    versions = ["1.0", "1.0.0", "0.4.0"]
     request = None
 
     def handle_exception(self, request, exception):
