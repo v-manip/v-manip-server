@@ -29,10 +29,10 @@
 from django.db import models
 
 class Layer(models.Model):
-	name = models.CharField(max_length=256)    
+	name = models.CharField(max_length=256, unique=True)
 
 	def __unicode__(self):
-		return self.name	
+		return self.name
 
 class TileLevel(models.Model):
 	layer = models.ForeignKey(Layer)
@@ -40,6 +40,11 @@ class TileLevel(models.Model):
 
 	def __unicode__(self):
 		return str(self.value) + ' of layer ' + self.layer.name
+
+# TODO: not working
+# class TileLevelAdmin(admin.ModelAdmin):
+#     list_display = ('name',)
+#     search_fields = ('layers__name',)
 
 class TileCol(models.Model):
 	tilelevel = models.ForeignKey(TileLevel)
