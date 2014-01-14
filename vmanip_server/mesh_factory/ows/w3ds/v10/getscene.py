@@ -8,7 +8,7 @@ from eoxserver.core.decoders import kvp
 from eoxserver.services.ows.interfaces import (
     ServiceHandlerInterface, GetServiceHandlerInterface
 )
-
+from eoxserver.resources.coverages import models
 
 from vmanip_server.mesh_factory.ows.w3ds.interfaces import SceneRendererInterface
 
@@ -28,7 +28,55 @@ class W3DSGetSceneHandler(Component):
 
     def handle(self, request):
 
-        return """Response for GetScene Request"""
+        # The following code is *not* actually related to W3DS "GetScene" but
+        # shall demonstrate the use of the curtain coverages and its associated
+        # data and metadata.
+
+        # For data/metadata extraction
+        import json
+        from eoxserver.contrib import gdal
+
+        # really basic response generation!
+        response = []
+
+
+        # iterate over all "curtain" coverages
+        for coverage in models.CurtainCoverage.objects.all():
+            # write the ID of the coverage
+            response.append("<h1>%s</h1>" % coverage.identifier)
+
+            # retrieve the data item pointing to the raster data
+            raster_item = coverage.data_items.get(
+                semantic__startswith="bands"
+            )
+
+            # open it with GDAL to get the width/height of the raster
+            ds = gdal.Open(raster_item.location)
+
+            response.append("Width: %d <br/>" % ds.RasterXSize)
+            response.append("Height: %d <br/>" % ds.RasterYSize)
+
+            # retrieve the data item pointing to the height values/levels
+            height_values_item = coverage.data_items.get(
+                semantic__startswith="heightvalues"
+            )
+
+            # load the json file to a list
+            with open(height_values_item.location) as f:
+                height_values = json.load(f)
+
+            # write out the height levels
+            response.append("Height levels (count: %d):<br/>" % len(height_values))
+            response.append("<ul>")
+            for height_value in height_values:
+                response.append("<li>%f</li>" % height_value)
+            response.append("</ul>")
+            
+        return "".join(response)
+
+
+        #return "\n".join(map(lambda c: c.identifier, models.CurtainCoverage.objects.all()))
+        #return """Response for GetScene Request"""
 
         '''
         # Pseudocode
