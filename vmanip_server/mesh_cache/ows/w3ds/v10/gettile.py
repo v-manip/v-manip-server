@@ -37,7 +37,29 @@ from vmanip_server.mesh_cache import models
 from django.http import HttpResponse
 import json
 
-# KVP decoder
+'''# request is a Django HTTPRequest object
+
+    if error:
+        raise Exception() # should be passed to the exceptionhandler
+
+    # NEVER! do this:
+    # self.something = something
+
+    # response is either a django HTTPResponse, a string or a tuple (content, content-type), (content, content-type, status-code)
+
+
+    # attention, pseudo code
+
+    decoder = W3DSGetTileKVPDecoder(request.GET)
+
+    tile = self.lookup_cache(decoder.layer, decoder.tilelevel, decoder.tilerow, decoder.tilecol)
+
+    if not tile:
+        #either return empty response, raise exception or proxy to mesh factory
+        
+
+    return response 
+'''
 
 class W3DSGetTileKVPDecoder(kvp.Decoder):
     crs = kvp.Parameter()
@@ -45,8 +67,6 @@ class W3DSGetTileKVPDecoder(kvp.Decoder):
     tilelevel = kvp.Parameter(type=int)
     tilerow = kvp.Parameter(type=int)
     tilecol = kvp.Parameter(type=int)
-
-# handler definition
 
 class W3DSGetTileHandler(Component):
     implements(ServiceHandlerInterface)
@@ -57,16 +77,19 @@ class W3DSGetTileHandler(Component):
     request = "GetTile"
 
     def handle(self, request):
-        data = self.lookup_cache('adm_aeolus', 1, 0, 0)
+        decoder = W3DSGetTileKVPDecoder(request.GET)
 
-        # FIXXME: error handling
-        # if not data:
-        #   self.handleError()
-        
+        model_filename = self.lookup_cache(decoder.layer, decoder.tilelevel, decoder.tilerow, decoder.tilecol)
+
+        if not model_filename:
+            # FIXXME: raise exception!
+            pass
+
+        data = self.loadJSONFromFile(model_filename)
+    
         return (json.dumps(data), 'application/json');
 
     def loadJSONFromFile(self, filename):
-        # json_data = open('static/answer.json')
         json_data = open(filename)
         data = json.load(json_data) # deserialize it
         json_data.close()
@@ -75,124 +98,85 @@ class W3DSGetTileHandler(Component):
     def lookup_cache(self, layer_name, tilelevel_value, tilecol_value, tilerow_value):
         tilerow = None
 
-        print 'Handling: ' + layer_name + '/' + str(tilelevel_value) + '/' + str(tilecol_value) + '/' + str(tilerow_value)
-
-        # FIXXME: When a layer is created for the first time it can be created multiple times, because
-        # the WebClient sends 4 parallel requests. The 'result' will be 0 for each of the 4 requests, therefore
-        # the new layer will get created in the database 4 times.
-        # The current workaround is to manually create the layer table upfront, but this has to be fixed!          
+        # print 'Handling: ' + layer_name + '/' + str(tilelevel_value) + '/' + str(tilecol_value) + '/' + str(tilerow_value)
+  
         layer_query = models.Layer.objects.filter(name=layer_name);
 
         if len(layer_query):
-            print 'Found layer: ' + layer_name
-            if len(layer_query) != 1:
-                print 'Error! There should only be one entry for each layer!'
+            # print 'Found layer: ' + layer_name
             layer = layer_query[0]
 
             tilelevel_query = models.TileLevel.objects.filter(layer=layer.id, value=tilelevel_value);
             if len(tilelevel_query):
-                print '0'
-                print 'Found level: ' + str(tilelevel_value) + ' for layer ' + layer_name
-                if len(layer_query) != 1:
-                    print 'Error! There should only be one entry for each level!'
+                # print 'Found level: ' + str(tilelevel_value) + ' for layer ' + layer_name
                 tilelevel = tilelevel_query[0]
 
                 tilecol_query = models.TileCol.objects.filter(tilelevel=tilelevel.id, value=tilecol_value);
                 if len(tilecol_query):
-                    print '1'
-                    print 'Found tilecol: ' + str(tilecol_value) + ' for level ' + str(tilelevel_value)
-                    if len(tilecol_query) != 1:
-                        print 'Error! There should only be one entry for each tilecol!'
+                    # print 'Found tilecol: ' + str(tilecol_value) + ' for level ' + str(tilelevel_value)
                     tilecol = tilecol_query[0]
                     
                     tilerow_query = models.TileRow.objects.filter(tilecol=tilecol.id, value=tilerow_value);
                     if len(tilerow_query):
-                        print '2'
-                        print 'Found tilerow: ' + str(tilerow_value) + ' for col ' + str(tilecol_value)
-                        if len(tilerow_query) != 1:
-                            print 'Error! There should only be one entry for each tilerow!'
+                        # print 'Found tilerow: ' + str(tilerow_value) + ' for col ' + str(tilecol_value)
                         tilerow = tilerow_query[0]
+                    else:
+                        tilerow = self.create_tilerow_record(tilecol, tilerow_value)
+
                 else:
                     tilerow = self.create_tilecol_record(tilelevel, tilecol_value, tilerow_value)
-                    print '3'                    
                     print 'Created tilerow record for: ' + str(tilerow_value)
             else:
                 tilerow = self.create_tilelevel_record(layer, tilelevel_value, tilecol_value, tilerow_value)
-                print '4'
                 print 'Created tilelevel record for: ' + str(tilelevel_value)
         else:
             tilerow = self.create_layer_record(layer_name, tilelevel_value, tilerow_value, tilecol_value)
-            print '5'
             print 'Created layer record for: ' + layer_name
 
-            print 'tilerow:'
-            print tilerow
+        if not tilerow:
+            raise Exception() # FIXXME: pass to exceptionhandler
 
-        #print 'tilerow_content: ' + tilerow.content_file
-
-        #content = self.loadJSONFromFile(tilerow.content_file)
-        #return content
-        return "asdf"
+        return tilerow.content_file
 
     def create_layer_record(self, layer_name, tilelevel_value, tilecol_value, tilerow_value):
+        content_filename = self.get_tile_content_from_factory()
+
         layer = models.Layer.objects.create(name=layer_name)
         tilelevel = models.TileLevel.objects.create(layer=layer, value=tilelevel_value)
         tilecol = models.TileCol.objects.create(tilelevel=tilelevel, value=tilecol_value)
-        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value)
-
-        # FIXXME: Request from MeshFactory!
-        tilerow.content_file = 'models/curtain_test/answer.json'
+        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value, content_file=content_filename)
 
         return tilerow
 
     def create_tilelevel_record(self, layer, tilelevel_value, tilecol_value, tilerow_value):
+        content_filename = self.get_tile_content_from_factory()
+
         tilelevel = models.TileLevel.objects.create(layer=layer, value=tilelevel_value)
         tilecol = models.TileCol.objects.create(tilelevel=tilelevel, value=tilecol_value)
-        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value)
-
-        # FIXXME: Request from MeshFactory!
-        tilerow.content_file = 'models/curtain_test/answer.json'
+        # Maybe use File.storage: https://docs.djangoproject.com/en/dev/topics/files/
+        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value, content_file=content_filename)
 
         return tilerow
 
     def create_tilecol_record(self, tilelevel, tilecol_value, tilerow_value):
-        tilecol = models.TileCol.objects.create(tilelevel=tilelevel, value=tilecol_value)
-        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value)
+        content_filename = self.get_tile_content_from_factory()
 
-        # FIXXME: Request from MeshFactory!
-        tilerow.content_file = 'models/curtain_test/answer.json'
+        tilecol = models.TileCol.objects.create(tilelevel=tilelevel, value=tilecol_value)
+        # Maybe use File.storage: https://docs.djangoproject.com/en/dev/topics/files/
+        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value, content_file=content_filename)
 
         return tilerow
 
     def create_tilerow_record(self, tilecol, tilerow_value):
-        tilecol = models.TileCol.objects.create(tilelevel=tilelevel, value=tilecol_value)
-        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value)
+        content_filename = self.get_tile_content_from_factory()
 
-        # FIXXME: Request from MeshFactory!
-        tilerow.content_file = 'models/curtain_test/answer.json'
+        # Maybe use File.storage: https://docs.djangoproject.com/en/dev/topics/files/
+        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value, content_file=content_filename)
 
         return tilerow
 
-        '''# request is a Django HTTPRequest object
+    def get_tile_content_from_factory(self):
+        # FIXXME: Request from MeshFactory!
+        # return 'models/curtain_test/answer.json'
+        return 'models/curtain_test/test.json'
 
-        if error:
-            raise Exception() # should be passed to the exceptionhandler
-
-        # NEVER! do this:
-        # self.something = something
-
-        # response is either a django HTTPResponse, a string or a tuple (content, content-type), (content, content-type, status-code)
-
-
-        # attention, pseudo code
-
-        decoder = W3DSGetTileKVPDecoder(request.GET)
-
-        tile = self.lookup_cache(decoder.layer, decoder.tilelevel, decoder.tilerow, decoder.tilecol)
-
-        if not tile:
-            #either return empty response, raise exception or proxy to mesh factory
-            
-
-        return response 
-    '''
