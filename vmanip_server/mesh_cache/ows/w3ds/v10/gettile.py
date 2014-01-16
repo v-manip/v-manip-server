@@ -80,15 +80,9 @@ class W3DSGetTileHandler(Component):
 
     def handle(self, request):
         decoder = W3DSGetTileKVPDecoder(request.GET)
-        #data = self.load_json_from_file(model_filename)
         data = self.lookup_cache(decoder)
-        return (json.dumps(data), 'application/json');
 
-    def load_json_from_file(self, filename):
-        json_data = open(filename)
-        data = json.load(json_data) # deserialize it
-        json_data.close()
-        return data
+        return (data, 'application/json');
 
     def lookup_cache(self, decoder):
         layer_name = decoder.layer
