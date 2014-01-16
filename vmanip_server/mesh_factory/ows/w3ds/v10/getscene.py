@@ -11,6 +11,7 @@ from eoxserver.services.ows.interfaces import (
 
 
 from vmanip_server.mesh_factory.ows.w3ds.interfaces import SceneRendererInterface
+import json
 
 
 # handler definition
@@ -27,8 +28,17 @@ class W3DSGetSceneHandler(Component):
     request = "GetScene"
 
     def handle(self, request):
+        # FIXXME: select file based on request params
+        model_filename = 'models/curtain_test/test.json'
+        data = self.load_json_from_file(model_filename)
 
-        return """Response for GetScene Request"""
+        return (json.dumps(data), 'application/json');
+
+    def load_json_from_file(self, filename):
+        json_data = open(filename)
+        data = json.load(json_data) # deserialize it
+        json_data.close()
+        return data
 
         '''
         # Pseudocode
