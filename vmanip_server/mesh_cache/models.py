@@ -56,7 +56,7 @@ class TileCol(models.Model):
 class TileRow(models.Model):
 	tilecol = models.ForeignKey(TileCol)
 	value = models.IntegerField()
-	content_file = models.CharField(max_length=256)
+	content_file = models.TextField()
 
 	def __unicode__(self):
 		return str(self.value) + ' of level ' + str(self.tilecol.value) + ' of layer ' + self.tilecol.tilelevel.layer.name

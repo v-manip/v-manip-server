@@ -37,6 +37,7 @@ from eoxserver.services.ows.interfaces import (
 from vmanip_server.mesh_cache import models
 from django.http import HttpResponse
 import json
+import urllib2
 
 '''# request is a Django HTTPRequest object
 
@@ -79,17 +80,11 @@ class W3DSGetTileHandler(Component):
 
     def handle(self, request):
         decoder = W3DSGetTileKVPDecoder(request.GET)
-        model_filename = self.lookup_cache(decoder)
-
-        if not model_filename:
-            # FIXXME: raise exception!
-            pass
-
-        data = self.loadJSONFromFile(model_filename)
-    
+        #data = self.load_json_from_file(model_filename)
+        data = self.lookup_cache(decoder)
         return (json.dumps(data), 'application/json');
 
-    def loadJSONFromFile(self, filename):
+    def load_json_from_file(self, filename):
         json_data = open(filename)
         data = json.load(json_data) # deserialize it
         json_data.close()
@@ -142,57 +137,69 @@ class W3DSGetTileHandler(Component):
             raise Exception() # FIXXME: pass to exceptionhandler
         
         # if tilelevel_value:
-        bbox_str = self.convert_tile_params_to_scene_bbox_string(tilelevel_value, tilecol_value, tilerow_value);
-        print 'GetScene request (' + str(tilelevel_value) + '/' + str(tilecol_value) + '/' + str(tilerow_value) + '):' + bbox_str
+        #   bbox_str = self.convert_tile_params_to_scene_bbox_string(tilelevel_value, tilecol_value, tilerow_value);
+        #   print 'GetScene request (' + str(tilelevel_value) + '/' + str(tilecol_value) + '/' + str(tilerow_value) + '):' + bbox_str
+
+        # Debugging only:
+        # self.get_tile_content_from_factory(decoder)
 
         return tilerow.content_file
 
     def create_layer_record(self, layer_name, tilelevel_value, tilecol_value, tilerow_value, decoder):
-        content_filename = self.get_tile_content_from_factory(decoder)
+        content = self.get_tile_content_from_factory(decoder)
 
         layer = models.Layer.objects.create(name=layer_name)
         tilelevel = models.TileLevel.objects.create(layer=layer, value=tilelevel_value)
         tilecol = models.TileCol.objects.create(tilelevel=tilelevel, value=tilecol_value)
-        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value, content_file=content_filename)
+        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value, content_file=content)
 
         return tilerow
 
     def create_tilelevel_record(self, layer, tilelevel_value, tilecol_value, tilerow_value, decoder):
-        content_filename = self.get_tile_content_from_factory(decoder)
+        content = self.get_tile_content_from_factory(decoder)
 
         tilelevel = models.TileLevel.objects.create(layer=layer, value=tilelevel_value)
         tilecol = models.TileCol.objects.create(tilelevel=tilelevel, value=tilecol_value)
         # Maybe use File.storage: https://docs.djangoproject.com/en/dev/topics/files/
-        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value, content_file=content_filename)
+        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value, content_file=content)
 
         return tilerow
 
     def create_tilecol_record(self, tilelevel, tilecol_value, tilerow_value, decoder):
-        content_filename = self.get_tile_content_from_factory(decoder)
+        content = self.get_tile_content_from_factory(decoder)
 
         tilecol = models.TileCol.objects.create(tilelevel=tilelevel, value=tilecol_value)
         # Maybe use File.storage: https://docs.djangoproject.com/en/dev/topics/files/
-        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value, content_file=content_filename)
+        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value, content_file=content)
 
         return tilerow
 
     def create_tilerow_record(self, tilecol, tilerow_value, decoder):
-        content_filename = self.get_tile_content_from_factory(decoder)
+        content = self.get_tile_content_from_factory(decoder)
 
         # Maybe use File.storage: https://docs.djangoproject.com/en/dev/topics/files/
-        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value, content_file=content_filename)
+        tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value, content_file=content)
 
         return tilerow
 
     def get_tile_content_from_factory(self, decoder):
+        layer_value = decoder.layer
         tilelevel_value = decoder.tilelevel
         tilecol_value = decoder.tilecol
         tilerow_value = decoder.tilerow
 
         bbox_str = self.convert_tile_params_to_scene_bbox_string(tilelevel_value, tilecol_value, tilerow_value)
         
-        # FIXXME: Request from MeshFactory!
-        return 'models/curtain_test/test.json'
+        # FIXXME: after a refactoring of gettyle.py into at least a separated MeshCache class the baseurl should be a parameter of this class!
+        baseurl = 'http://localhost:8000/ows?service=W3DS&request=GetScene&version=1.0.0&crs=EPSG:4326&format=model/gltf'
+        params = '&layer={0}&tileLevel={1}&tilecol={2}&tilerow={3}'.format(layer_value, tilelevel_value, tilecol_value, tilerow_value);
+        # print 'factory url: ' + (baseurl+params)
+
+        response = urllib2.urlopen(baseurl+params)
+        data = response.read()
+        response.close()
+
+        return data
 
     def convert_tile_params_to_scene_bbox_string(self, tilelevel, tilecol, tilerow):
         level_0_num_tiles_x = 4 # cols
@@ -201,8 +208,8 @@ class W3DSGetTileHandler(Component):
         tile_width  = 360 / ( level_0_num_tiles_x*pow(2,tilelevel))
         tile_height = 180 / ( level_0_num_tiles_y*pow(2,tilelevel))
 
-        print 'tile_width  (level: ' + str(tilelevel) + ') = ' + str(tile_width)
-        print 'tile_height (level: ' + str(tilelevel) + ') = ' + str(tile_height)
+        # print 'tile_width  (level: ' + str(tilelevel) + ') = ' + str(tile_width)
+        # print 'tile_height (level: ' + str(tilelevel) + ') = ' + str(tile_height)
 
         west = -180 + (tilecol*tile_width)
         east = west + tile_width
