@@ -192,10 +192,12 @@ class W3DSGetTileHandler(Component):
         
         # FIXXME: after a refactoring of gettyle.py into at least a separated MeshCache class the baseurl should be a parameter of this class!
         baseurl = 'http://localhost:8000/ows?service=W3DS&request=GetScene&version=1.0.0&crs=EPSG:4326&format=model/gltf'
-        params = '&layer={0}&tileLevel={1}&tilecol={2}&tilerow={3}'.format(layer_value, tilelevel_value, tilecol_value, tilerow_value);
-        # print 'factory url: ' + (baseurl+params)
+        layer = '&layer={0}'.format(layer_value)
+        bbox = '&boundingBox={0}'.format(bbox_str)
+        url = baseurl + layer + bbox
+        # print 'factory url: ' + (url)
 
-        response = urllib2.urlopen(baseurl+params)
+        response = urllib2.urlopen(url)
         data = response.read()
         response.close()
 
@@ -216,4 +218,7 @@ class W3DSGetTileHandler(Component):
         north = 90 - (tilerow*tile_height)
         south = north - tile_height
 
-        return str(west) + ',' + str(east) + ',' + str(north) + ',' + str(south)
+        # from the W3DS standard draft:
+        # "The value of the BoundingBox parameter is a list of comma-separated real
+        # numbers in the form 'minx,miny,maxx,maxy'."
+        return str(west) + ',' + str(south) + ',' + str(east) + ',' + str(north)
