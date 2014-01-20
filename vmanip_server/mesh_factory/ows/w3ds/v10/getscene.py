@@ -1,6 +1,8 @@
 # copyright notice
 
 
+import pdb 
+#import pudb 
 
 #imports
 from eoxserver.core import Component, implements, ExtensionPoint
@@ -9,10 +11,29 @@ from eoxserver.services.ows.interfaces import (
     ServiceHandlerInterface, GetServiceHandlerInterface
 )
 from eoxserver.resources.coverages import models
-
+import numpy as np
 from vmanip_server.mesh_factory.ows.w3ds.interfaces import SceneRendererInterface
+from collada import *
+import os
+from collada_helper import trianglestrip, make_emissive_material
+#from xml_parse_curtain import xml_parse_curtain
+import geocoord
+from PIL import Image
 
+# map a subrange of a float image to an 8 bit PNG
+# and write it to disk
+#
+#  returns size of image
+def mapimage(infile, outfile, lmin, lmax):
+    im = Image.open(infile)
+    i=np.array(list(im.getdata())).reshape(im.size[::-1])
+    g=np.divide(np.subtract(i,lmin), (lmax-lmin)/255.0)
+    g[g<0]=0
+    iout=Image.fromarray(g.astype(np.uint8), 'L')
+    iout.save(outfile, "PNG")
+    return im.size
 
+    
 # handler definition
 
 
@@ -31,14 +52,23 @@ class W3DSGetSceneHandler(Component):
         # The following code is *not* actually related to W3DS "GetScene" but
         # shall demonstrate the use of the curtain coverages and its associated
         # data and metadata.
-
         # For data/metadata extraction
         import json
         from eoxserver.contrib import gdal
 
+        min_level = -40 # maps to 0 in output texture
+        max_level =  50 # maps to 255 in output texture
+        exaggeration = 40 # multiplier for curtain height in visualization
+        output_dir="/var/data/model"
+        converter_path="/vagrant/shares/glTF/converter/COLLADA2GLTF/bin/collada2gltf"
+        
+        # create new collada scene
+        mesh = Collada()
+
+        geom_nodes=[] # list for all the curtain parts
+        
         # really basic response generation!
         response = []
-
 
         # iterate over all "curtain" coverages
         for coverage in models.CurtainCoverage.objects.all():
@@ -49,29 +79,86 @@ class W3DSGetSceneHandler(Component):
             raster_item = coverage.data_items.get(
                 semantic__startswith="bands"
             )
-
+            
+            in_name=raster_item.location        # texture file name
+            # construct the texture names for conversion
+            basename=os.path.basename(in_name)
+            (name, _) =os.path.splitext(os.path.basename(in_name)) # generate a unique identifier
+            #in_name=os.path.join(input_dir, texture_file_name)
+            out_name=os.path.join(output_dir, name+'.png')
+            response.append("Input file: %s<br>" % raster_item.location) 
+            response.append("Output file: %s<br>" % out_name) 
+            response.append("ID: %s<br>" % name) 
+            # map range of texture and convert to png 
+            (width, height)=mapimage(in_name, out_name, min_level, max_level) 
+            
             # open it with GDAL to get the width/height of the raster
-            ds = gdal.Open(raster_item.location)
-
-            response.append("Width: %d <br/>" % ds.RasterXSize)
-            response.append("Height: %d <br/>" % ds.RasterYSize)
+            # ds = gdal.Open(raster_item.location)
+            # width=ds.RasterXSize
+            # height=ds.RasterYSize
+            
+            response.append("Width: %d <br/>" % width)
+            response.append("Height: %d <br/>" % height)
 
             # retrieve the data item pointing to the height values/levels
             height_values_item = coverage.data_items.get(
                 semantic__startswith="heightvalues"
             )
 
-            # load the json file to a list
+            # retrieve the data item pointing to the coordinates
+            gcps_item = coverage.data_items.get(
+                semantic__startswith="gcps"
+            )
+            #pu.db
+           # load the json files to lists
             with open(height_values_item.location) as f:
                 height_values = json.load(f)
 
-            # write out the height levels
-            response.append("Height levels (count: %d):<br/>" % len(height_values))
-            response.append("<ul>")
-            for height_value in height_values:
-                response.append("<li>%f</li>" % height_value)
-            response.append("</ul>")
+            with open(gcps_item.location) as f:
+                gcps = json.load(f)
+
+            # write out the coordinates
+            response.append("Coordinates (count: %d):<br/>" % len(gcps))
+            heightLevelsList=np.array(height_values)
+            response.append("Height levels count: %d, min: %d, max: %d<br/>" % (len(height_values), heightLevelsList.min(), heightLevelsList.max()))                
+            # create a unique material for each texture
+            matnode = make_emissive_material(mesh, "Material-"+name, name+".png")
+
+            # now build the geometry
+            t=trianglestrip()
+            for [x, y, u, v]  in gcps:
+                #response.append(("X: %.2f Y: %.2f   U: %.0f V:%.0f<br>" % (x, y, u, v)))
+                point=geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.min())))
+                u=u/width # this is not correct, need to be in the middle of the texel
+                t.add_point(point, [u, 0], [0, 0, 1])
+                point=geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.max()*exaggeration)))
+                t.add_point(point, [u, 1], [0, 0, 1])
+                
+            # put everything in a geometry node
+            geomnode=t.make_geometry(mesh, "Strip-"+name, matnode)
+            geom_nodes.append(geomnode)
+                
+                #print 
+#            response.append("<br></ul>")
             
+            #pdb.set_trace()    
+#            break
+            
+        # put all the geometry nodes in a scene node
+        node = scene.Node("node0", children=geom_nodes)
+        myscene = scene.Scene("myscene", [node])
+        mesh.scenes.append(myscene)
+        mesh.scene = myscene
+        
+        out_file=os.path.join(output_dir, 'test.dae')
+        # now write the collada file to a temporary location
+        mesh.write(out_file)
+
+        # and convert it to glTF
+        converter_output=os.popen(converter_path+" -f "+out_file+" -o %stest.gltf"%output_dir).read()
+        response.append("<h3>converter output</h3><pre>")
+        response.append(converter_output+"</pre>")
+        
         return "".join(response)
 
 
