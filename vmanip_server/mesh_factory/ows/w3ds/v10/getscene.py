@@ -13,6 +13,9 @@ from eoxserver.services.ows.interfaces import (
 from vmanip_server.mesh_factory.ows.w3ds.interfaces import SceneRendererInterface
 import json
 
+class W3DSGetSceneKVPDecoder(kvp.Decoder):
+    crs = kvp.Parameter()
+    layer = kvp.Parameter()
 
 # handler definition
 
@@ -28,8 +31,15 @@ class W3DSGetSceneHandler(Component):
     request = "GetScene"
 
     def handle(self, request):
-        # FIXXME: select file based on request params
-        model_filename = 'models/curtain_test/test.json'
+        decoder = W3DSGetSceneKVPDecoder(request.GET)
+
+        if decoder.layer == 'vrvis_demo':
+            model_filename = 'products/vrvis_demo/vrvis-demo.json'
+            print '[MeshFactory] delivered vrvis_demo product'
+        else:
+            model_filename = 'products/eox_demo/test.json'
+            print '[MeshFactory] delivered eox_demo product'
+
         data = self.load_json_from_file(model_filename)
 
         return (json.dumps(data), 'application/json');
