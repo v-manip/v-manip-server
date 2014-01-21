@@ -82,6 +82,8 @@ class W3DSGetTileHandler(Component):
         decoder = W3DSGetTileKVPDecoder(request.GET)
         data = self.lookup_cache(decoder)
 
+        # print 'data: ', data
+
         return (data, 'application/json');
 
     def lookup_cache(self, decoder):
@@ -189,7 +191,8 @@ class W3DSGetTileHandler(Component):
         layer = '&layer={0}'.format(layer_value)
         bbox = '&boundingBox={0}'.format(bbox_str)
         url = baseurl + layer + bbox
-        # print 'factory url: ' + (url)
+
+        # print 'factory url: ' + url
 
         response = urllib2.urlopen(url)
         data = response.read()

@@ -27,28 +27,58 @@ class W3DSGetSceneHandler(Component):
     renderers = ExtensionPoint(SceneRendererInterface)
 
     service = "W3DS"
-    versions = ["1.0"]
+    versions = ["1.0.0"]
     request = "GetScene"
 
     def handle(self, request):
         decoder = W3DSGetSceneKVPDecoder(request.GET)
+        model_filename = None
+        data_is_json = True
 
-        if decoder.layer == 'vrvis_demo':
-            model_filename = 'products/vrvis_demo/vrvis-demo.json'
-            print '[MeshFactory] delivered vrvis_demo product'
+        if (decoder.layer == 'vrvis_demo'):
+            model_filename = 'products/vrvis_demo/vrvis_demo.json'
+            # print '[MeshFactory] delivered vrvis_demo product'
+        elif (decoder.layer == 'eox_demo'):
+            model_filename = 'products/eox_demo/eox_demo.json'
+            # print '[MeshFactory] delivered eox_demo product'
+        elif (decoder.layer == 'h2o_vol_demo'):
+            model_filename = 'products/h2o_vol_demo/h2o.nii.gz'
+            data_is_json = false
+            print '[MeshFactory] delivered h2o_vol_demo product'
+        elif (decoder.layer == 'pressure_vol'):
+            model_filename = 'products/pressure_vol_demo/pressure.nii.gz'
+            data_is_json = false
+            print '[MeshFactory] delivered pressure_vol_demo product' 
+        elif (decoder.layer == 'temperature_vol'):
+            model_filename = 'products/temperature_vol_demo/temperature.nii.gz'
+            print '[MeshFactory] delivered temperature_vol_demo product'
+
+        if model_filename:
+            if data_is_json:
+                data = self.load_json_from_file(model_filename)
+                return (data, 'application/json')
+            else:
+                return (model_filename, 'text/plain')
         else:
-            model_filename = 'products/eox_demo/test.json'
-            print '[MeshFactory] delivered eox_demo product'
+            print 'ERROR: NO PRODUCT WITH NAME ' + decoder.layer + ' FOUND!'
+            return ("{}", 'application/json')
 
-        data = self.load_json_from_file(model_filename)
 
-        return (json.dumps(data), 'application/json');
+        # print 'GetScene: filename = ', model_filename
+
+        # if data_is_json:
+        #     data = self.load_json_from_file(model_filename)
+        #     return (json.dumps(data), 'application/json')
+        # else:
+        #     data = open(model_filename)
+        #     return (data, 'application/nii-gz')
+
 
     def load_json_from_file(self, filename):
         json_data = open(filename)
         data = json.load(json_data) # deserialize it
         json_data.close()
-        return data
+        return json.dumps(data)
 
         '''
         # Pseudocode
