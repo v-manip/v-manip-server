@@ -11,6 +11,8 @@ from eoxserver.services.ows.interfaces import (
     ServiceHandlerInterface, GetServiceHandlerInterface
 )
 from eoxserver.resources.coverages import models
+from django.contrib.gis.geos import GEOSGeometry
+from django.contrib.gis.geos import Polygon
 import numpy as np
 from vmanip_server.mesh_factory.ows.w3ds.interfaces import SceneRendererInterface
 from collada import *
@@ -49,9 +51,6 @@ class W3DSGetSceneHandler(Component):
 
     def handle(self, request):
 
-        # The following code is *not* actually related to W3DS "GetScene" but
-        # shall demonstrate the use of the curtain coverages and its associated
-        # data and metadata.
         # For data/metadata extraction
         import json
         from eoxserver.contrib import gdal
@@ -67,13 +66,18 @@ class W3DSGetSceneHandler(Component):
 
         geom_nodes=[] # list for all the curtain parts
         
-        # really basic response generation!
+        # debug response generation!
         response = []
 
+        
+        bbox=Polygon.from_bbox((31, -60, 37, -40))
+        #pdb.set_trace()
         # iterate over all "curtain" coverages
-        for coverage in models.CurtainCoverage.objects.all():
+        #for coverage in models.CurtainCoverage.objects.all():
+        for coverage in models.CurtainCoverage.objects.filter(footprint__intersects=bbox):
+            
             # write the ID of the coverage
-            response.append("<h1>%s</h1>" % coverage.identifier)
+            response.append("%s: " % coverage.identifier)
 
             # retrieve the data item pointing to the raster data
             raster_item = coverage.data_items.get(
@@ -82,13 +86,12 @@ class W3DSGetSceneHandler(Component):
             
             in_name=raster_item.location        # texture file name
             # construct the texture names for conversion
-            basename=os.path.basename(in_name)
+            #basename=os.path.basename(in_name)
             (name, _) =os.path.splitext(os.path.basename(in_name)) # generate a unique identifier
-            #in_name=os.path.join(input_dir, texture_file_name)
             out_name=os.path.join(output_dir, name+'.png')
-            response.append("Input file: %s<br>" % raster_item.location) 
-            response.append("Output file: %s<br>" % out_name) 
-            response.append("ID: %s<br>" % name) 
+            #response.append("Input file: %s<br>" % raster_item.location) 
+            #response.append("Output file: %s<br>" % out_name) 
+            #response.append("ID: %s<br>" % name) 
             # map range of texture and convert to png 
             (width, height)=mapimage(in_name, out_name, min_level, max_level) 
             
@@ -97,8 +100,7 @@ class W3DSGetSceneHandler(Component):
             # width=ds.RasterXSize
             # height=ds.RasterYSize
             
-            response.append("Width: %d <br/>" % width)
-            response.append("Height: %d <br/>" % height)
+            #response.append("image width: %d, height: %d<br/>" % (width, height))
 
             # retrieve the data item pointing to the height values/levels
             height_values_item = coverage.data_items.get(
@@ -109,22 +111,27 @@ class W3DSGetSceneHandler(Component):
             gcps_item = coverage.data_items.get(
                 semantic__startswith="gcps"
             )
-            #pu.db
-           # load the json files to lists
+            
+            
+            # load the json files to lists
             with open(height_values_item.location) as f:
                 height_values = json.load(f)
+            heightLevelsList=np.array(height_values)
 
             with open(gcps_item.location) as f:
                 gcps = json.load(f)
 
+            coords=np.array(gcps)
+            X=coords[:,0]
+            Y=coords[:,1]
             # write out the coordinates
-            response.append("Coordinates (count: %d):<br/>" % len(gcps))
-            heightLevelsList=np.array(height_values)
-            response.append("Height levels count: %d, min: %d, max: %d<br/>" % (len(height_values), heightLevelsList.min(), heightLevelsList.max()))                
+            response.append("%d coordinates (Xmin: %d, Xmax: %d, Ymin: %d, Ymax: %d), %d height levels (min: %d, max: %d)<br/>" % (len(gcps), X.min(), X.max(), Y.min(), Y.max(),len(height_values), heightLevelsList.min(), heightLevelsList.max()))              
             # create a unique material for each texture
             matnode = make_emissive_material(mesh, "Material-"+name, name+".png")
 
             # now build the geometry
+            #pdb.set_trace()
+            
             t=trianglestrip()
             for [x, y, u, v]  in gcps:
                 #response.append(("X: %.2f Y: %.2f   U: %.0f V:%.0f<br>" % (x, y, u, v)))
