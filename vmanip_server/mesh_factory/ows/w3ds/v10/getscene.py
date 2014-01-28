@@ -1,16 +1,18 @@
 # copyright notice
 
-
 import pdb 
 #import pudb 
 
 #imports
 from eoxserver.core import Component, implements, ExtensionPoint
-from eoxserver.core.decoders import kvp
+from eoxserver.core.decoders import kvp, typelist, InvalidParameterException
 from eoxserver.services.ows.interfaces import (
     ServiceHandlerInterface, GetServiceHandlerInterface
 )
 from eoxserver.resources.coverages import models
+from eoxserver.services.ows.wms.util import (
+    lookup_layers, parse_bbox, parse_time, int_or_str
+)
 from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.geos import Polygon
 import numpy as np
@@ -35,6 +37,11 @@ def mapimage(infile, outfile, lmin, lmax):
     iout.save(outfile, "PNG")
     return im.size
 
+class W3DSGetSceneKVPDecoder(kvp.Decoder):
+    #crs = kvp.Parameter()
+    #layers = kvp.Parameter(type=typelist(",", str))
+    bbox = kvp.Parameter(type=parse_bbox, num=1)
+    # look at getscene parameter
     
 # handler definition
 
@@ -61,6 +68,9 @@ class W3DSGetSceneHandler(Component):
         output_dir="/var/data/model"
         converter_path="/vagrant/shares/glTF/converter/COLLADA2GLTF/bin/collada2gltf"
         
+        decoder = W3DSGetSceneKVPDecoder(request.GET)
+        
+        
         # create new collada scene
         mesh = Collada()
 
@@ -70,7 +80,8 @@ class W3DSGetSceneHandler(Component):
         response = []
 
         
-        bbox=Polygon.from_bbox((31, -60, 37, -40))
+        #bbox=Polygon.from_bbox((31, -60, 37, -40))
+        bbox=Polygon.from_bbox(tuple(decoder.bbox))
         #pdb.set_trace()
         # iterate over all "curtain" coverages
         #for coverage in models.CurtainCoverage.objects.all():
@@ -219,10 +230,6 @@ class W3DSGetSceneHandler(Component):
 
 
 
-class W3DSGetSceneKVPDecoder(kvp.Decoder):
-    crs = kvp.Parameter()
-    layers = kvp.Parameter(type=typelist(",", str))
-    # look at getscene parameter
 
     '''
 
