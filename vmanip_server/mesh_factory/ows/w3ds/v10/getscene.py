@@ -65,11 +65,14 @@ class W3DSGetSceneHandler(Component):
         min_level = -40 # maps to 0 in output texture
         max_level =  50 # maps to 255 in output texture
         exaggeration = 40 # multiplier for curtain height in visualization
-        output_dir="/var/data/model"
+        output_dir="/var/data/glTF"
         converter_path="/vagrant/shares/lib/collada2gltf"
         
         decoder = W3DSGetSceneKVPDecoder(request.GET)
         
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+            
         
         # create new collada scene
         mesh = Collada()
@@ -168,12 +171,14 @@ class W3DSGetSceneHandler(Component):
         mesh.scenes.append(myscene)
         mesh.scene = myscene
         
-        out_file=os.path.join(output_dir, 'test.dae')
+        out_file_dae=os.path.join(output_dir, 'test.dae')
+        out_file_gltf=os.path.join(output_dir, 'test.gltf')
         # now write the collada file to a temporary location
-        mesh.write(out_file)
+        mesh.write(out_file_dae)
 
         # and convert it to glTF
-        converter_output=os.popen(converter_path+" -f "+out_file+" -o %stest.gltf"%output_dir).read()
+        converter_output=os.popen(converter_path+" -f "+out_file_dae+" -o "+out_file_gltf).read()
+        response.append(converter_path+" -f "+out_file_dae+" -o "+out_file_gltf)
         response.append("<h3>converter output</h3><pre>")
         response.append(converter_output+"</pre>")
         
