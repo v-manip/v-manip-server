@@ -3,6 +3,9 @@
 
 
 #imports
+
+from os.path import join
+
 from eoxserver.core import Component, implements, ExtensionPoint
 from eoxserver.core.decoders import kvp
 from eoxserver.services.ows.interfaces import (
@@ -35,22 +38,24 @@ class W3DSGetSceneHandler(Component):
         model_filename = None
         data_is_json = True
 
+        base_path = settings.PROJECT_DIR
+
         if (decoder.layer == 'vrvis_demo'):
-            model_filename = 'products/vrvis_demo/vrvis_demo.json'
+            model_filename = join(base_path, 'products/vrvis_demo/vrvis_demo.json')
             # print '[MeshFactory] delivered vrvis_demo product'
         elif (decoder.layer == 'eox_demo'):
-            model_filename = 'products/eox_demo/eox_demo.json'
+            model_filename = join(base_path, 'products/eox_demo/eox_demo.json')
             # print '[MeshFactory] delivered eox_demo product'
         elif (decoder.layer == 'h2o_vol_demo'):
-            model_filename = 'products/h2o_vol_demo/h2o.nii.gz'
+            model_filename = join(base_path, 'products/h2o_vol_demo/h2o.nii.gz')
             data_is_json = false
             print '[MeshFactory] delivered h2o_vol_demo product'
         elif (decoder.layer == 'pressure_vol'):
-            model_filename = 'products/pressure_vol_demo/pressure.nii.gz'
+            model_filename = join(base_path, 'products/pressure_vol_demo/pressure.nii.gz')
             data_is_json = false
             print '[MeshFactory] delivered pressure_vol_demo product' 
         elif (decoder.layer == 'temperature_vol'):
-            model_filename = 'products/temperature_vol_demo/temperature.nii.gz'
+            model_filename = join(base_path, 'products/temperature_vol_demo/temperature.nii.gz')
             print '[MeshFactory] delivered temperature_vol_demo product'
 
         if model_filename:
