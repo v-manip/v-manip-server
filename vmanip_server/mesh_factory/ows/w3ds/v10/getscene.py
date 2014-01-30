@@ -5,6 +5,7 @@
 #imports
 
 from os.path import join
+from django.conf import settings
 
 from eoxserver.core import Component, implements, ExtensionPoint
 from eoxserver.core.decoders import kvp
