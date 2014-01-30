@@ -20,9 +20,9 @@ from vmanip_server.mesh_factory.ows.w3ds.interfaces import SceneRendererInterfac
 from collada import *
 import os
 from collada_helper import trianglestrip, make_emissive_material
-#from xml_parse_curtain import xml_parse_curtain
-import geocoord
 from PIL import Image
+import geocoord
+from bboxclip import ClipPolylineBoundingBox, BoundingBox, v2dp
 
 # map a subrange of a float image to an 8 bit PNG
 # and write it to disk
@@ -85,7 +85,8 @@ class W3DSGetSceneHandler(Component):
         
         #bbox=Polygon.from_bbox((31, -60, 37, -40))
         bbox=Polygon.from_bbox(tuple(decoder.bbox))
-        #pdb.set_trace()
+        mybbox=BoundingBox(decoder.bbox[0], decoder.bbox[1], decoder.bbox[2], decoder.bbox[3])
+
         # iterate over all "curtain" coverages
         #for coverage in models.CurtainCoverage.objects.all():
         for coverage in models.CurtainCoverage.objects.filter(footprint__intersects=bbox):
@@ -146,24 +147,45 @@ class W3DSGetSceneHandler(Component):
             # now build the geometry
             #pdb.set_trace()
             
-            t=trianglestrip()
+            # stuff curtain piece footprint in polyline
+            polyline=list()
+            print
             for [x, y, u, v]  in gcps:
-                #response.append(("X: %.2f Y: %.2f   U: %.0f V:%.0f<br>" % (x, y, u, v)))
-                point=geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.min())))
-                u=u/width # this is not correct, need to be in the middle of the texel
-                t.add_point(point, [u, 0], [0, 0, 1])
-                point=geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.max()*exaggeration)))
-                t.add_point(point, [u, 1], [0, 0, 1])
+                polyline.append(v2dp(x, y, u))
+                #print "%5.1f,%5.1f | "%(x,y),
+            #print "<"
+
+             # clip curtain on bounding box
+            polylist=ClipPolylineBoundingBox(polyline, mybbox)
+
+            # convert all clipped polylines to triangle strips
+            n=0
+            if len(polylist)>0: 
+                for pl in polylist:
+                    if len(pl)>0:
+                        # now build the geometry
+                        t=trianglestrip()
+                        for p in pl:
+                            x=p.x
+                            y=p.y
+                            u=p.u
+                            #print "%5.1f,%5.1f | "%(x,y),
+                            point=geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.min())))
+                            u=u/width # this is not correct, need to be in the middle of the texel
+                            t.add_point(point, [u, 0], [0, 0, 1])
+                            point=geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.max()*exaggeration)))
+                            t.add_point(point, [u, 1], [0, 0, 1])
+                            
+                        n=n+1
+                        #print "<<"
+                        #print
+                        # put everything in a geometry node
+                        geomnode=t.make_geometry(mesh, "Strip-%d-"%n+name, matnode) # all these pieces have the same material
+                        geom_nodes.append(geomnode)
                 
-            # put everything in a geometry node
-            geomnode=t.make_geometry(mesh, "Strip-"+name, matnode)
-            geom_nodes.append(geomnode)
-                
-                #print 
-#            response.append("<br></ul>")
+            #pdb.set_trace()
             
             #pdb.set_trace()    
-#            break
             
         # put all the geometry nodes in a scene node
         node = scene.Node("node0", children=geom_nodes)

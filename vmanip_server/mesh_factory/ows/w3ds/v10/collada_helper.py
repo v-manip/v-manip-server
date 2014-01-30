@@ -48,7 +48,7 @@ def make_emissive_material(mesh, name, texture_file_name):
     surf=material.Surface(name+"-surf", texture)
     sampler=material.Sampler2D(name+"-sampl", surf, minfilter="LINEAR_MIPMAP_LINEAR", magfilter="NONE")
     uvmap=material.Map(sampler, "TEXCOORD_0")
-    effect = material.Effect(name+"-effect", [sampler, surf], "phong", emission=uvmap, double_sided=True)
+    effect = material.Effect(name+"-effect", [sampler, surf], "lambert", emission=uvmap, double_sided=True)
     mat = material.Material(name+"-material", name, effect)
     mesh.effects.append(effect)
     mesh.materials.append(mat)
