@@ -1,5 +1,7 @@
+# -*- coding: latin-1 -*-
+
 from collections import namedtuple
-from math import hypot
+from math import hypot, fabs
 from collections import OrderedDict
 
 #===============================================================================
@@ -161,10 +163,71 @@ class BoundingBox:
         self.bottom=InfiniteLine2d(Xmax, Ymin, Xmin, Ymin, True)
     
 #===============================================================================
-
+#
+# clips the supplied polyline (v2dp list) on the bounding box
+# guarantees that points within eps of a boundary are consistently clipped (see above)
+#     
 def ClipPolylineBoundingBox(polyline, bbox, eps=1e-8):
     
     pl=ClipPolylineHalfspace(polyline, bbox.left, eps)
+    pr=ClipPolylineListHalfspace(pl, bbox.right, eps)
+    pt=ClipPolylineListHalfspace(pr, bbox.top, eps)
+    return ClipPolylineListHalfspace(pt, bbox.bottom, eps)
+
+#===============================================================================
+#
+# correctly handles wraparound of x-coordinates at ±wrap_at:
+#        a polyline segment going from -X to +X with a difference >wrap_at is
+#        handled as straddling the X=±wrap_at boundary (e.g. the 180th meridian)
+# returns a list of polylines guaranteed to NOT cross the wrap_at line
+# 
+def ClipPolylineOnWrap(polyline, wrap_at=180, eps=1e-8):
+    polylist=list()
+    newline=list()
+    po=polyline.pop(0)
+    newline.append(po)
+    for pn in polyline:
+        if (pn.x*po.x<0.0) and (fabs(pn.x-po.x)>wrap_at): # segment straddles wraparound
+            if (po.x<pn.x): # check from which side we come
+                # coming from -X: (po<0, pn>0)
+                ponew = po+v2dp(wrap_at*2.0, 0.0, 0.0) # move po into +X
+                pnnew = pn+v2dp(-wrap_at*2.0, 0.0, 0.0) # move pn into -X
+            else: # coming from +X: (pn<0, po>0)
+                ponew = po+v2dp(-wrap_at*2.0, 0.0, 0.0) # move po into -X
+                pnnew = pn+v2dp(wrap_at*2.0, 0.0, 0.0) # move pn into +X
+        
+            ho = wrap_at-fabs(po.x) # distance po to wrap_at line
+            hn = wrap_at-fabs(pn.x) # distance pn to wrap_at line
+        
+            if (ho+hn)<eps: # both points on the wrap_at line
+                factor=0.5 # just put it in the middle
+            else:
+                factor= (ho / (ho + hn))
+                
+            # intersection points with wrap_at:    
+            IPn = (ponew+(pn - ponew)*factor) # positive side
+            IPo = (po   +(pnnew - po)*factor) # negative side
+            newline.append(IPo)
+            po=IPo
+            polylist.append(newline)
+            newline=list()
+            newline.append(IPn)
+        newline.append(pn)
+        po=pn
+    
+    polylist.append(newline)
+    return polylist
+
+#===============================================================================
+#
+# clips the supplied polyline (v2dp list) on the bounding box
+# guarantees that points within eps of a boundary are consistently clipped (see above)
+# additionally correctly handles wraparound of x-coordinates at ±wrap_at
+#        (e.g. the 180th meridian)
+#
+def ClipPolylineBoundingBoxOnSphere(polyline, bbox, wrap_at=180, eps=1e-8):
+    pw=ClipPolylineOnWrap(polyline, wrap_at, eps)
+    pl=ClipPolylineListHalfspace(pw, bbox.left, eps)
     pr=ClipPolylineListHalfspace(pl, bbox.right, eps)
     pt=ClipPolylineListHalfspace(pr, bbox.top, eps)
     return ClipPolylineListHalfspace(pt, bbox.bottom, eps)

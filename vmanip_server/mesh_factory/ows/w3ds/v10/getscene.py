@@ -22,7 +22,7 @@ import os
 from collada_helper import trianglestrip, make_emissive_material
 from PIL import Image
 import geocoord
-from bboxclip import ClipPolylineBoundingBox, BoundingBox, v2dp
+from bboxclip import ClipPolylineBoundingBoxOnSphere, BoundingBox, v2dp
 
 # map a subrange of a float image to an 8 bit PNG
 # and write it to disk
@@ -156,7 +156,7 @@ class W3DSGetSceneHandler(Component):
             #print "<"
 
              # clip curtain on bounding box
-            polylist=ClipPolylineBoundingBox(polyline, mybbox)
+            polylist=ClipPolylineBoundingBoxOnSphere(polyline, mybbox)
 
             # convert all clipped polylines to triangle strips
             n=0
