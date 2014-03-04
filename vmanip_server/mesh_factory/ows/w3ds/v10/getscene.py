@@ -42,15 +42,15 @@ class W3DSGetSceneHandler(Component):
             model_filename = 'products/eox_demo/eox_demo.json'
             # print '[MeshFactory] delivered eox_demo product'
         elif (decoder.layer == 'h2o_vol_demo'):
-            model_filename = 'products/h2o_vol_demo/h2o.nii.gz'
-            data_is_json = false
+            model_filename = 'products/h2o_vol_demo/H2O.nii.gz'
+            data_is_json = False
             print '[MeshFactory] delivered h2o_vol_demo product'
         elif (decoder.layer == 'pressure_vol'):
-            model_filename = 'products/pressure_vol_demo/pressure.nii.gz'
-            data_is_json = false
+            model_filename = 'products/pressure_vol_demo/Pressure.nii.gz'
+            data_is_json = False
             print '[MeshFactory] delivered pressure_vol_demo product' 
         elif (decoder.layer == 'temperature_vol'):
-            model_filename = 'products/temperature_vol_demo/temperature.nii.gz'
+            model_filename = 'products/temperature_vol_demo/Temperature.nii.gz'
             print '[MeshFactory] delivered temperature_vol_demo product'
 
         if model_filename:
@@ -58,10 +58,10 @@ class W3DSGetSceneHandler(Component):
                 data = self.load_json_from_file(model_filename)
                 return (data, 'application/json')
             else:
-                return (model_filename, 'text/plain')
+                return (open(model_filename), 'model/nii-gz')
         else:
             print 'ERROR: NO PRODUCT WITH NAME ' + decoder.layer + ' FOUND!'
-            return ("{}", 'application/json')
+            return ('{ "errorText": "No product with id ' + decoder.layer + ' available" }', 'application/json')
 
 
         # print 'GetScene: filename = ', model_filename
@@ -75,9 +75,12 @@ class W3DSGetSceneHandler(Component):
 
 
     def load_json_from_file(self, filename):
-        json_data = open(filename)
-        data = json.load(json_data) # deserialize it
-        json_data.close()
+        try:
+            json_data = open(filename)
+            data = json.load(json_data) # deserialize it
+            json_data.close()
+        except:
+            print '[MeshFactory] file: "' + filename + '"" not readable'
         return json.dumps(data)
 
         '''
