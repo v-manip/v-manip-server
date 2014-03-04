@@ -26,7 +26,7 @@
 #-------------------------------------------------------------------------------
 
 from vmanip_server.mesh_cache import models
-from vmanip_server.mesh_cache import tileset
+# from vmanip_server.mesh_cache import tileset
 from eoxserver.core.decoders import kvp
 from django.http import HttpResponse
 import json
