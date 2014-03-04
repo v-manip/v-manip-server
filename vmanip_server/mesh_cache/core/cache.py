@@ -26,6 +26,7 @@
 #-------------------------------------------------------------------------------
 
 from vmanip_server.mesh_cache import models
+from vmanip_server.mesh_cache import tileset
 from eoxserver.core.decoders import kvp
 from django.http import HttpResponse
 import json
@@ -46,6 +47,8 @@ class MeshCache:
         print '1'
         decoder = W3DSGetTileKVPDecoder(request.GET)
         print '2'
+
+        #tileset.open('/var/www/cache/TEST_OPTICAL.sqlite')
 
         layer_name = decoder.layer
         tilelevel_value = decoder.tilelevel
