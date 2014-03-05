@@ -26,12 +26,12 @@
 #-------------------------------------------------------------------------------
 
 from vmanip_server.mesh_cache import models
-# from vmanip_server.mesh_cache import tileset
+from vmanip_server.mesh_cache import mapcache
+
 from eoxserver.core.decoders import kvp
 from django.http import HttpResponse
 import json
 import urllib2
-
 
 class W3DSGetTileKVPDecoder(kvp.Decoder):
     crs = kvp.Parameter()
@@ -44,11 +44,7 @@ class W3DSGetTileKVPDecoder(kvp.Decoder):
 
 class MeshCache:
     def lookup_request(self, request):
-        print '1'
         decoder = W3DSGetTileKVPDecoder(request.GET)
-        print '2'
-
-        #tileset.open('/var/www/cache/TEST_OPTICAL.sqlite')
 
         layer_name = decoder.layer
         tilelevel_value = decoder.tilelevel
@@ -56,14 +52,31 @@ class MeshCache:
         tilerow_value = decoder.tilerow
         # time_value = decoder.time
 
-        print '3'
+        # 2. Store the retrieved textures in the MapCache:
+        mapcache_c = mapcache.Connection()
+        # FIXXME: get from content object!
+        # texture = open('products/vrvis_demo/Reflectivity_2013137113720_0000.png', 'r')
+        texture = open('/var/ngeob_autotest/data/reference_test_data/ASA_WS__0P_20100722_101601.jpg', 'r')
+        print texture
+
+        print 'vor texture.read()'
+        # blob = texture.read();
+        # print blob
+        
+        # FIXXME: use decoder.time!
+        time = '2013-05-01T13:00:00Z/2013-05-18T15:30:00Z'
+        # FIXXME: use decoder.layer
+        layer = 'Cloudsat'
+        mapcache_c.handle(layer, 'WGS84', time, decoder.tilecol, decoder.tilerow, decoder.tilelevel, texture)
+
+        print 'nach texture.read()'
+
         tilerow = None
 
-        # print 'Handling: ' + layer_name + '/' + str(tilelevel_value) + '/' + str(tilecol_value) + '/' + str(tilerow_value)
+        print 'Handling: ' + layer_name + '/' + str(tilelevel_value) + '/' + str(tilecol_value) + '/' + str(tilerow_value)
 
         layer_query = models.Layer.objects.filter(name=layer_name);
 
-        print '4'
         if len(layer_query):
             # print 'Found layer: ' + layer_name
             layer = layer_query[0]
@@ -137,8 +150,29 @@ class MeshCache:
         return tilerow
 
     def create_tilerow_record(self, tilecol, tilerow_value, decoder):
+        # 1. Get the glTF content from the MeshFactory:
         content = self.get_tile_content_from_factory(decoder)
 
+        # # 2. Store the retrieved textures in the MapCache:
+        # mapcache_c = mapcache.Connection()
+        # # FIXXME: get from content object!
+        # # texture = open('products/vrvis_demo/Reflectivity_2013137113720_0000.png', 'r')
+        # texture = open('/var/ngeob_autotest/data/reference_test_data/ASA_WS__0P_20100722_101601.jpg', 'r')
+        # print texture
+
+        # print 'vor texture.read()'
+        # blob = texture.read();
+        # print blob
+        # print 'nach texture.read()'
+
+        # # FIXXME: use decoder.time!
+        # time = '2013-05-01T13:00:00Z/2013-05-18T15:30:00Z'
+        # mapcache_c.handle(decoder.layer, 'WGS84', time, decoder.tilecol, decoder.tilerow, decoder.tilelevel, texture)
+
+        # 3. Rewrite .json to link to the WMTS url of the texture:
+        # FIXXME!
+
+        # 4. Create the entry for the glTF content in the MeshCache database:
         # Maybe use File.storage: https://docs.djangoproject.com/en/dev/topics/files/
         tilerow = models.TileRow.objects.create(tilecol=tilecol, value=tilerow_value, content_file=content)
 
