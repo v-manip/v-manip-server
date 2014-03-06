@@ -2,11 +2,12 @@ from os.path import exists, basename, isfile
 import sqlite3
 from io import BytesIO
 from datetime import datetime
-import Image
+import logging
 
 from django.db import models as models
 from django.db import connections
 
+logger = logging.getLogger(__name__)
 
 URN_TO_GRID = {
     "urn:ogc:def:wkss:OGC:1.0:GoogleMapsCompatible": "GoogleMapsCompatible",
@@ -15,17 +16,17 @@ URN_TO_GRID = {
 
 class Connection(object):
     def handle(self, tileset, grid, dim, x, y, z, f):
-        print('[MapCache::handle]: Parameters: row: %s / col: %s / level: %s' % (x,y,z))
+        logger.info('[MapCache::handle]: Parameters: row: %s / col: %s / level: %s' % (x,y,z))
 
         # image = Image.open('products/vrvis_demo/Reflectivity_2013137113720_0000.png')
         # Note: should throw Exception if image is not valid. Not tested...
         # isOK = image.verify()
 
         db = self.opendb('/var/www/cache/%s.sqlite' % (tileset))
-        print('[MapCache::handle] Opened sqlite db: ' + '/var/www/cache/%s.sqlite' % (tileset))
+        logger.info('[MapCache::handle] Opened sqlite db: ' + '/var/www/cache/%s.sqlite' % (tileset))
 
         db.add_tile(tileset, grid, dim, x, y, z, f);
-        print('[MapCache::handle] Added tile.')
+        logger.info('[MapCache::handle] Added tile.')
 
     def opendb(self, path, mode="r"):
         db_exists = isfile(path)
@@ -139,11 +140,15 @@ class SQLiteSchemaTileSet(object):
         """
         with sqlite3.connect(self.path) as connection:
             cur = connection.cursor()
-            tmp = buffer(f.read())
-            print tmp
+            img_buffer = buffer(f.read())
+
+            f.seek(0)
+            print 'img_buffer str len: ' + str(len(f.read()))
+
             cur.execute("INSERT INTO tiles VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        (tileset, grid, x, y, z, buffer(f.read()), dim, 
+                        (tileset, grid, x, y, z, img_buffer, dim, 
                          datetime.now()))
+            connection.commit()
         
         
 

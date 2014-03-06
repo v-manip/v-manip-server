@@ -32,6 +32,7 @@ from eoxserver.services.ows.interfaces import (
     ServiceHandlerInterface, GetServiceHandlerInterface
 )
 from vmanip_server.mesh_cache.core.cache import MeshCache
+import logging
 
 '''# request is a Django HTTPRequest object
 
@@ -57,6 +58,8 @@ from vmanip_server.mesh_cache.core.cache import MeshCache
     return response 
 '''
 
+logger = logging.getLogger(__name__)
+
 class W3DSGetTileHandler(Component):
     implements(ServiceHandlerInterface)
     implements(GetServiceHandlerInterface)
@@ -66,11 +69,9 @@ class W3DSGetTileHandler(Component):
     request = "GetTile"
 
     def handle(self, request):
-        print 'vor meshcache 0 '
         mesh_cache = MeshCache()
-        print 'vor meshcache 1 '
         data = mesh_cache.lookup_request(request)
-        print 'vor meshcache 2'
+        logger.info('Handled request, returning data...')
 
         #print 'data: ', data
         # return ('{"bla":"1"}', 'application/json');

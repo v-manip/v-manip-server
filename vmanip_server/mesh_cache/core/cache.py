@@ -55,25 +55,26 @@ class MeshCache:
         # 2. Store the retrieved textures in the MapCache:
         mapcache_c = mapcache.Connection()
         # FIXXME: get from content object!
-        # texture = open('products/vrvis_demo/Reflectivity_2013137113720_0000.png', 'r')
-        texture = open('/var/ngeob_autotest/data/reference_test_data/ASA_WS__0P_20100722_101601.jpg', 'r')
-        print texture
+        try:
+            filename = 'products/vrvis_demo/Reflectivity_2013137113720_0000.png'
+            texture = open(filename, 'r')
+        except:
+            print '[MeshCache] file: "' + filename + '" not readable'
+        # texture = open('/var/ngeob_autotest/data/reference_test_data/ASA_WS__0P_20100722_101601.jpg', 'r')
+        # print 'str size:   ' + str(len(texture.read()))
+        # texture.seek(0)
+        #print texture
 
-        print 'vor texture.read()'
-        # blob = texture.read();
-        # print blob
-        
         # FIXXME: use decoder.time!
-        time = '2013-05-01T13:00:00Z/2013-05-18T15:30:00Z'
+        # time = '2012-05-17T10:50:00Z/2013-05-17T11:00:00Z'
+        time = ''
         # FIXXME: use decoder.layer
-        layer = 'Cloudsat'
+        layer = 'TEST_OSM'
         mapcache_c.handle(layer, 'WGS84', time, decoder.tilecol, decoder.tilerow, decoder.tilelevel, texture)
-
-        print 'nach texture.read()'
 
         tilerow = None
 
-        print 'Handling: ' + layer_name + '/' + str(tilelevel_value) + '/' + str(tilecol_value) + '/' + str(tilerow_value)
+        # print 'Handling: ' + layer_name + '/' + str(tilelevel_value) + '/' + str(tilecol_value) + '/' + str(tilerow_value)
 
         layer_query = models.Layer.objects.filter(name=layer_name);
 
