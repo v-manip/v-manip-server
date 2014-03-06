@@ -56,7 +56,8 @@ class MeshCache:
         mapcache_c = mapcache.Connection()
         # FIXXME: get from content object!
         try:
-            filename = 'products/vrvis_demo/Reflectivity_2013137113720_0000.png'
+            # filename = 'products/vrvis_demo/Reflectivity_2013137113720_0000.png'
+            filename = '/var/ngeob_autotest/data/test_data/test-tile.png'
             texture = open(filename, 'r')
         except:
             print '[MeshCache] file: "' + filename + '" not readable'

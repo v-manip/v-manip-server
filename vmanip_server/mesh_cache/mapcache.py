@@ -18,10 +18,6 @@ class Connection(object):
     def handle(self, tileset, grid, dim, x, y, z, f):
         logger.info('[MapCache::handle]: Parameters: row: %s / col: %s / level: %s' % (x,y,z))
 
-        # image = Image.open('products/vrvis_demo/Reflectivity_2013137113720_0000.png')
-        # Note: should throw Exception if image is not valid. Not tested...
-        # isOK = image.verify()
-
         db = self.opendb('/var/www/cache/%s.sqlite' % (tileset))
         logger.info('[MapCache::handle] Opened sqlite db: ' + '/var/www/cache/%s.sqlite' % (tileset))
 
@@ -142,13 +138,13 @@ class SQLiteSchemaTileSet(object):
             cur = connection.cursor()
             img_buffer = buffer(f.read())
 
-            f.seek(0)
-            print 'img_buffer str len: ' + str(len(f.read()))
-
-            cur.execute("INSERT INTO tiles VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        (tileset, grid, x, y, z, img_buffer, dim, 
-                         datetime.now()))
-            connection.commit()
+            try:            
+                cur.execute("INSERT INTO tiles VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                            (tileset, grid, x, y, z, img_buffer, dim, 
+                             datetime.now()))
+                connection.commit()
+            except:
+                logger.debug('Prevented duplicate tile from being inserted (source: database constraint)')
         
         
 
