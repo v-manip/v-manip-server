@@ -1,6 +1,7 @@
 # copyright notice
 
 import pdb
+import glob
 #import pudb
 
 #imports
@@ -10,6 +11,7 @@ from eoxserver.services.ows.interfaces import (
     ServiceHandlerInterface, GetServiceHandlerInterface
 )
 from eoxserver.resources.coverages import models
+from eoxserver.services.result import ResultFile, to_http_response
 from eoxserver.services.ows.wms.util import (
     lookup_layers, parse_bbox, parse_time, int_or_str
 )
@@ -36,6 +38,7 @@ def mapimage(infile, outfile, lmin, lmax):
     g[g<0]=0
     iout=Image.fromarray(g.astype(np.uint8), 'L')
     iout.save(outfile, "PNG")
+    print "Saving to: %s"%outfile
     return im.size
 
 class W3DSGetSceneKVPDecoder(kvp.Decoder):
@@ -86,7 +89,7 @@ class W3DSGetSceneHandler(Component):
 
         # debug response generation!
         response = []
-
+        result_set = []
 
         #bbox=Polygon.from_bbox((31, -60, 37, -40))
         bbox=Polygon.from_bbox(tuple(decoder.bbox))
@@ -119,7 +122,8 @@ class W3DSGetSceneHandler(Component):
             #response.append("ID: %s<br>" % name)
             # map range of texture and convert to png
             (width, height)=mapimage(in_name, out_name, min_level, max_level)
-
+#            result_set.append(ResultFile(out_name, filename=out_name, content_type="application/octet-stream"))
+            
             # open it with GDAL to get the width/height of the raster
             # ds = gdal.Open(raster_item.location)
             # width=ds.RasterXSize
@@ -217,7 +221,7 @@ class W3DSGetSceneHandler(Component):
                             geomnode=t.make_geometry(mesh, "Strip-%d-"%n+name, matnode) # all these pieces have the same material
                             geom_nodes.append(geomnode)
 
-            #pdb.set_trace()
+        #pdb.set_trace()
 
         # put all the geometry nodes in a scene node
         node = scene.Node("node0", children=geom_nodes)
@@ -226,7 +230,7 @@ class W3DSGetSceneHandler(Component):
         mesh.scene = myscene
 
         out_file_dae=os.path.join(output_dir, 'test.dae')
-        out_file_gltf=os.path.join(output_dir, 'test.gltf')
+        out_file_gltf=os.path.join(output_dir, 'test.json')
         # now write the collada file to a temporary location
         mesh.write(out_file_dae)
 
@@ -235,7 +239,15 @@ class W3DSGetSceneHandler(Component):
         response.append(converter_path+" -f "+out_file_dae+" -o "+out_file_gltf)
         response.append("<h3>converter output</h3><pre>")
         response.append(converter_output+"</pre>")
+        #result_set.append(ResultFile(out_file_gltf, filename='test.json', content_type="application/json"))
+        outfiles = glob.glob(output_dir + '/*.*')
+        for of in outfiles:
+            print "attaching file: ", of
+            
+            result_set.append(ResultFile(of, filename=os.path.split(of)[1], content_type="application/octet-stream"))
 
+        #return to_http_response(result_set)
+        
         return "".join(response)
 
 
