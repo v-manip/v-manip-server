@@ -25,6 +25,7 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
+from __future__ import division
 from vmanip_server.mesh_cache import models
 from vmanip_server.mesh_cache import mapcache
 
@@ -36,7 +37,7 @@ import urllib2
 class W3DSGetTileKVPDecoder(kvp.Decoder):
     crs = kvp.Parameter()
     layer = kvp.Parameter()
-    # time = kvp.Parameter()
+    time = kvp.Parameter()
     tilelevel = kvp.Parameter(type=int)
     tilerow = kvp.Parameter(type=int)
     tilecol = kvp.Parameter(type=int)
@@ -50,7 +51,7 @@ class MeshCache:
         tilelevel_value = decoder.tilelevel
         tilecol_value = decoder.tilecol
         tilerow_value = decoder.tilerow
-        # time_value = decoder.time
+        time_value = decoder.time
 
         # 2. Store the retrieved textures in the MapCache:
         mapcache_c = mapcache.Connection()
@@ -185,19 +186,13 @@ class MeshCache:
         tilelevel_value = decoder.tilelevel
         tilecol_value = decoder.tilecol
         tilerow_value = decoder.tilerow
-        # time_value = decoder.time
+        time_value = decoder.time
 
         bbox_str = self.convert_tile_params_to_scene_bbox_string(tilelevel_value, tilecol_value, tilerow_value)
         
         # FIXXME: after a refactoring of gettyle.py into at least a separated MeshCache class the baseurl should be a parameter of this class!
         baseurl = 'http://localhost:8000/ows?service=W3DS&request=GetScene&version=1.0.0&crs=EPSG:4326&format=model/gltf'
-        layer = '&layer={0}'.format(layer_value)
-        bbox = '&boundingBox={0}'.format(bbox_str)
-        # time = '&time={0}'.format(time_value)
-        # url = baseurl + layer + bbox + time
-        url = baseurl + layer + bbox
-
-        # print 'factory url: ' + url
+        url = '{0}&layer={1}&boundingBox={2}&time={3}'.format(baseurl, layer_value, bbox_str, time_value)
 
         response = urllib2.urlopen(url)
         data = response.read()
@@ -206,6 +201,7 @@ class MeshCache:
         return data
 
     def convert_tile_params_to_scene_bbox_string(self, tilelevel, tilecol, tilerow):
+        # NOTE: This setting has to be adapted to the grid schema the web-client is using!
         level_0_num_tiles_x = 4 # cols
         level_0_num_tiles_y = 2 # rows
 

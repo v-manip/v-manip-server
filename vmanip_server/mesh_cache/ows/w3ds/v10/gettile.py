@@ -26,7 +26,6 @@
 # THE SOFTWARE.
 #-------------------------------------------------------------------------------
 
-from __future__ import division
 from eoxserver.core import Component, implements
 from eoxserver.services.ows.interfaces import (
     ServiceHandlerInterface, GetServiceHandlerInterface
