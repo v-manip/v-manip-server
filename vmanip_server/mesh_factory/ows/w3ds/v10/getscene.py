@@ -246,9 +246,9 @@ class W3DSGetSceneHandler(Component):
             
             result_set.append(ResultFile(of, filename=os.path.split(of)[1], content_type="application/octet-stream"))
 
-        #return to_http_response(result_set)
+        return to_http_response(result_set)
         
-        return "".join(response)
+        #return "".join(response)
 
 
         #return "\n".join(map(lambda c: c.identifier, models.CurtainCoverage.objects.all()))
