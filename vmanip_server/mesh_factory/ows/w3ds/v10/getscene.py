@@ -27,25 +27,14 @@ from PIL import Image
 import geocoord
 from bboxclip import clipPolylineBoundingBoxOnSphere, BoundingBox, v2dp
 
-# map a subrange of a float image to an 8 bit PNG
-# and write it to disk
-#
-#  returns size of image
-def mapimage(infile, outfile, lmin, lmax):
-    im = Image.open(infile)
-    i=np.array(list(im.getdata())).reshape(im.size[::-1])
-    g=np.divide(np.subtract(i,lmin), (lmax-lmin)/255.0)
-    g[g<0]=0
-    iout=Image.fromarray(g.astype(np.uint8), 'L')
-    iout.save(outfile, "PNG")
-    print "Saving to: %s"%outfile
-    return im.size
+
 
 class W3DSGetSceneKVPDecoder(kvp.Decoder):
     #crs = kvp.Parameter()
     #layers = kvp.Parameter(type=typelist(",", str))
     bbox = kvp.Parameter(type=parse_bbox, num=1)
     # look at getscene parameter
+
 
 # handler definition
 
@@ -77,7 +66,6 @@ class W3DSGetSceneHandler(Component):
         GeometryResolutionPerTile = 16
         MaximalCurtainsPerResponse = 32
 
-
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
@@ -96,7 +84,8 @@ class W3DSGetSceneHandler(Component):
         mybbox=BoundingBox(decoder.bbox[0], decoder.bbox[1], decoder.bbox[2], decoder.bbox[3])
         # use a minimal step size of (diagonal of bbox) / GeometryResolutionPerTile
         #minimalStepSize = great circle diagonal of bbox / GeometryResolutionPerTile
-        minimalStepSize = v2dp(decoder.bbox[0], decoder.bbox[1], 0.0).great_circle_distance(v2dp(decoder.bbox[2], decoder.bbox[3], 0.0)) / GeometryResolutionPerTile
+        minimalStepSize = v2dp(decoder.bbox[0], decoder.bbox[1], 0.0).great_circle_distance(
+            v2dp(decoder.bbox[2], decoder.bbox[3], 0.0)) / GeometryResolutionPerTile
         response.append( "minimal step size: %6.4f<br>" % minimalStepSize )
 
         # iterate over all "curtain" coverages
@@ -121,8 +110,16 @@ class W3DSGetSceneHandler(Component):
             #response.append("Output file: %s<br>" % out_name)
             #response.append("ID: %s<br>" % name)
             # map range of texture and convert to png
-            (width, height)=mapimage(in_name, out_name, min_level, max_level)
+            #(width, height) = mapimage(in_name, out_name, min_level, max_level)
 #            result_set.append(ResultFile(out_name, filename=out_name, content_type="application/octet-stream"))
+		    textureImage = Image.open(in_name)
+		    (width, height) = textureImage.size
+		    if textureImage.mode == 'F':  # still a float image: (we expect 8bit)
+		        # map a subrange of a float image to an 8 bit PNG
+		        i = np.array(list(textureImage.getdata())).reshape(textureImage.size[::-1])
+		        g = np.divide(np.subtract(i, min_level), (max_level - min_level) / 255.0)
+		        g[g < 0] = 0
+		        textureImage = Image.fromarray(g.astype(np.uint8), 'L')
             
             # open it with GDAL to get the width/height of the raster
             # ds = gdal.Open(raster_item.location)
@@ -154,7 +151,10 @@ class W3DSGetSceneHandler(Component):
             X=coords[:,0]
             Y=coords[:,1]
             # write out the coordinates
-            response.append("%d coordinates (Xmin: %d, Xmax: %d, Ymin: %d, Ymax: %d), %d height levels (min: %d, max: %d)<br/>" % (len(gcps), X.min(), X.max(), Y.min(), Y.max(),len(height_values), heightLevelsList.min(), heightLevelsList.max()))
+            response.append(
+                "%d coordinates (Xmin: %d, Xmax: %d, Ymin: %d, Ymax: %d), %d height levels (min: %d, max: %d)<br/>" % (
+                    len(gcps), X.min(), X.max(), Y.min(), Y.max(), len(height_values), heightLevelsList.min(),
+                    heightLevelsList.max()))
             # create a unique material for each texture
             matnode = make_emissive_material(mesh, "Material-"+name, name+".png")
 
@@ -179,7 +179,8 @@ class W3DSGetSceneHandler(Component):
             #[u, v, x, y] = UVXY[-1]
             [x, y, u, v]  = gcps[-1]
             polyline.append(v2dp(x, y, u))  # insert last ColRow entry
-            print "- %d nodes, length curtain = %6.3f" % (len(polyline), polyline[0].great_circle_distance(polyline[-1]))
+            print "- %d nodes, length curtain = %6.3f" % (
+                len(polyline), polyline[0].great_circle_distance(polyline[-1]))
 
              # clip curtain on bounding box
             polylist=clipPolylineBoundingBoxOnSphere(polyline, mybbox)
@@ -194,7 +195,7 @@ class W3DSGetSceneHandler(Component):
                         # now build the geometry
                         t=trianglestrip()
                         for p in pl:
-                            u=p.u / (width+1) # this is not correct, need to be in the middle of the texel
+		                    u = p.u
                             u_min = min (u_min, u)
                             u_max = max (u_max, u)
 
@@ -210,18 +211,35 @@ class W3DSGetSceneHandler(Component):
                             for p in pl:
                                 x=p.x
                                 y=p.y
-                                u=p.u / (width+1) / u_scale + u_min # this is not correct, need to be in the middle of the texel
-                                #response.append("U(%5.2f %5.2f) X, Y=(%5.2f,%5.2f), "%(p.u, u, x, y))
-                                point=geocoord.fromGeoTo3D(np.array((x, heightLevelsList.min(), y)))
+		                        u = (p.u / u_scale + u_min) / (width + 1)  # normalize u to range [0,1]
+		                        print ("U(%5.2f %5.2f) X, Y=(%5.2f,%5.2f), " % (p.u, u, x, y))
+		                        point = geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.min())))
                                 t.add_point(point, [u, 0], [0, 0, 1])
-                                point=geocoord.fromGeoTo3D(np.array((x, heightLevelsList.max()*exaggeration, y)))
+		                        point = geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.max() * exaggeration)))
                                 t.add_point(point, [u, 1], [0, 0, 1])
                             n=n+1
                             # put everything in a geometry node
-                            geomnode=t.make_geometry(mesh, "Strip-%d-"%n+name, matnode) # all these pieces have the same material
+                            geomnode = t.make_geometry(mesh, "Strip-%d-" % n + name,
+                                                       matnode)  # all these pieces have the same material
                             geom_nodes.append(geomnode)
-
+        print "min=%f, max=%f" % (u_min, u_max),
         #pdb.set_trace()
+        # now crop the image to the resolution we need:
+        textureImage = textureImage.crop((int(round(u_min)), 0, int(round(u_max)) + 1, height))
+
+        # and resize it to the maximum allowed tile size
+        (width, height) = textureImage.size
+        if width > TextureResolutionPerTile:
+            height = float(height) * float(TextureResolutionPerTile) / float(width)
+            width = float(TextureResolutionPerTile)
+
+        if height > TextureResolutionPerTile:
+            height = float(TextureResolutionPerTile)
+            width = float(width) * float(TextureResolutionPerTile) / float(height)
+
+        textureImage = textureImage.resize((int(round(width)), int(round(height))), Image.ANTIALIAS)
+        textureImage.save(out_name, "PNG")
+	    print
 
         # put all the geometry nodes in a scene node
         node = scene.Node("node0", children=geom_nodes)
