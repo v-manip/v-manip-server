@@ -23,7 +23,8 @@ from vmanip_server.mesh_factory.ows.w3ds.interfaces import SceneRendererInterfac
 from collada import *
 import os
 from collada_helper import trianglestrip, make_emissive_material
-from PIL import Image
+#from PIL import Image
+import Image
 import geocoord
 from bboxclip import clipPolylineBoundingBoxOnSphere, BoundingBox, v2dp
 
@@ -70,7 +71,8 @@ class W3DSGetSceneHandler(Component):
         max_level =  50 # maps to 255 in output texture
         exaggeration = 40 # multiplier for curtain height in visualization
         output_dir="/var/data/glTF"
-        converter_path="/vagrant/shares/lib/collada2gltf"
+        # converter_path="/vagrant/shares/lib/collada2gltf"
+        converter_path="/var/lib/collada2gltf"
         
         decoder = W3DSGetSceneKVPDecoder(request.GET)
         TextureResolutionPerTile = 256
