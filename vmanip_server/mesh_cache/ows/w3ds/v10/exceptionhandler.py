@@ -40,6 +40,7 @@ class W3DSExceptionHandler(Component):
 
     def handle_exception(self, request, exception):
 
-
-       	return "Exception %s" % str(exception), "text/plain"
+        import sys;
+        raise sys.exc_info()
+       	#return "Exception %s" % str(exception), "text/plain"
         #return "XXX", "text/xml"
