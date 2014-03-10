@@ -9,8 +9,8 @@
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-# copies of the Software, and to permit persons to whom the Software is 
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in all
@@ -30,17 +30,17 @@ from eoxserver.core import Component, implements
 from eoxserver.services.ows.interfaces import ExceptionHandlerInterface
 
 
-
 class W3DSExceptionHandler(Component):
     implements(ExceptionHandlerInterface)
 
     service = "W3DS"
-    versions = ["1.0", "1.0.0"]
+    versions = ["1.0", "1.0.0", "0.4.0"]
     request = None
 
     def handle_exception(self, request, exception):
 
-        import sys;
-        raise sys.exc_info()
-       	#return "Exception %s" % str(exception), "text/plain"
+        # import sys
+        # raise sys.exc_info()
+        print "Exception %s" % str(exception)
+        return "Exception %s" % str(exception), "text/plain"
         #return "XXX", "text/xml"

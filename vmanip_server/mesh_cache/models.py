@@ -28,4 +28,36 @@
 
 from django.db import models
 
-# Create your models here.
+class Layer(models.Model):
+	name = models.CharField(max_length=256, unique=True)
+
+	def __unicode__(self):
+		return self.name
+
+class TileLevel(models.Model):
+	layer = models.ForeignKey(Layer)
+	value = models.IntegerField()
+
+	def __unicode__(self):
+		return str(self.value) + ' of layer ' + self.layer.name
+
+# TODO: not working
+# class TileLevelAdmin(admin.ModelAdmin):
+#     list_display = ('name',)
+#     search_fields = ('layers__name',)
+
+class TileCol(models.Model):
+	tilelevel = models.ForeignKey(TileLevel)
+	value = models.IntegerField()
+
+	def __unicode__(self):
+		return str(self.value) + ' of level ' + str(self.tilelevel.value) + ' of layer ' + str(self.tilelevel.layer.name)
+
+class TileRow(models.Model):
+	tilecol = models.ForeignKey(TileCol)
+	value = models.IntegerField()
+	content_file = models.TextField()
+
+	def __unicode__(self):
+		return str(self.value) + ' of level ' + str(self.tilecol.value) + ' of layer ' + self.tilecol.tilelevel.layer.name
+

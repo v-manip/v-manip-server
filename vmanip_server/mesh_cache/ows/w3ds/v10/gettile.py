@@ -1,16 +1,17 @@
 #-------------------------------------------------------------------------------
 #
 # Project: V-MANIP Server <http://v-manip.eox.at>
-# Authors: Daniel Santillan <daniel.santillan@eox.at>
+# Authors: Martin Hecher <martin.hecher@fraunhofer.at>
+#          Daniel Santillan <daniel.santillan@eox.at>
 #
 #-------------------------------------------------------------------------------
-# Copyright (C) 2012 EOX IT Services GmbH
+# Copyright (C) 2014 Fraunhofer Austria GmbH
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-# copies of the Software, and to permit persons to whom the Software is 
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in all
@@ -26,19 +27,25 @@
 #-------------------------------------------------------------------------------
 
 
-
-#imports
 from eoxserver.core import Component, implements
-from eoxserver.core.decoders import kvp
 from eoxserver.services.ows.interfaces import (
     ServiceHandlerInterface, GetServiceHandlerInterface
 )
-from django.http import HttpResponse
-import json
+from eoxserver.core.decoders import kvp
+from vmanip_server.mesh_cache.mesh_cache import MeshCache
+import logging
 
-import os
 
-# handler definition
+logger = logging.getLogger(__name__)
+
+
+class W3DSGetTileKVPDecoder(kvp.Decoder):
+    crs = kvp.Parameter()
+    layer = kvp.Parameter()
+    time = kvp.Parameter()
+    tilelevel = kvp.Parameter(type=int)
+    tilerow = kvp.Parameter(type=int)
+    tilecol = kvp.Parameter(type=int)
 
 
 class W3DSGetTileHandler(Component):
@@ -46,49 +53,45 @@ class W3DSGetTileHandler(Component):
     implements(GetServiceHandlerInterface)
 
     service = "W3DS"
-    versions = ["0.4.0"]
+    versions = ["1.0", "1.0.0", "0.4.0"]
     request = "GetTile"
 
     def handle(self, request):
-        # FIXXME: retrieve model.json from cache!
-        json_data = open('static/model.json')
-        data = json.load(json_data) # deserialize it
-        json_data.close()
-
-        # response = HttpResponse(json.dumps(data), content_type='application/json')
-        # response['Content-Disposition'] = 'attachment; filename="model.json"'     
-        # return response
-
-        return (json.dumps(data), 'application/json');
-
-        '''# request is a Django HTTPRequest object
-
-        if error:
-            raise Exception() # should be passed to the exceptionhandler
-
-        # NEVER! do this:
-        # self.something = something
-
-        # response is either a django HTTPResponse, a string or a tuple (content, content-type), (content, content-type, status-code)
-
-
-        # attention, pseudo code
-
         decoder = W3DSGetTileKVPDecoder(request.GET)
 
-        tile = self.lookup_cache(decoder.layer, decoder.tilelevel, decoder.tilerow, decoder.tilecol)
+        # magic cookie:
+        if decoder.tilelevel == 9999:
+            self.seed()
+            return ('{ "status:" "seeding" }', 'application/json')
 
-        if not tile:
-            #either return empty response, raise exception or proxy to mesh factory
+        layer = decoder.layer
+        grid = decoder.crs
+        level = decoder.tilelevel
+        col = decoder.tilecol
+        row = decoder.tilerow
+        time = decoder.time
+
+        logger.debug('[W3DSGetTileHandler::handle] %s / %s / %s / %s / %s / %s' % (layer, grid, level, col, row, time))
+
+        mesh_cache = MeshCache()
+        tile_geo = mesh_cache.lookup(layer, grid, level, col, row, time)
+        
+        # FIXXME: debugging only!
+        # tile_geo = False
+
+        if not tile_geo:
+            print 'No tile geometry available, requesting from source (MeshFactory) ...'
+            tile_geo = mesh_cache.request_and_store(layer, grid, level, col, row, time)
+
+            # print 'TILE_GEO: ', tile_geo
             
+            if not tile_geo:
+                raise Exception('Could not request data from source (MeshFactory)')
 
-        return response 
+        logger.debug('[W3DSGetTileHandler::handle] returning tile_geo\n%s:' % (tile_geo,))
 
+        return (tile_geo, 'application/json')
 
-class W3DSGetTileKVPDecoder(kvp.Decoder):
-    crs = kvp.Parameter()
-    layer = kvp.Parameter()
-    tilelevel = kvp.Parameter(type=int)
-    tilerow = kvp.Parameter(type=int)
-    tilecol = kvp.Parameter(type=int)
-    '''
+    def seed(self):
+        for i in range(4):
+            print 'seeding: ', i
