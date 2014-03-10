@@ -3,6 +3,7 @@
 import pdb
 import glob
 #import pudb
+import tempfile
 
 #imports
 from eoxserver.core import Component, implements, ExtensionPoint
@@ -59,7 +60,7 @@ class W3DSGetSceneHandler(Component):
         min_level = -40 # maps to 0 in output texture
         max_level =  50 # maps to 255 in output texture
         exaggeration = 40 # multiplier for curtain height in visualization
-        output_dir="/var/data/glTF"
+        
         converter_path="/vagrant/shares/lib/collada2gltf"
         
         decoder = W3DSGetSceneKVPDecoder(request.GET)
@@ -72,9 +73,8 @@ class W3DSGetSceneHandler(Component):
         GeometryResolutionPerTile = 16
         MaximalCurtainsPerResponse = 32
 
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-
+        output_dir=tempfile.mkdtemp(prefix='tmp_meshfactory_')
+        print "creating %s"%output_dir
 
         # create new collada scene
         mesh = Collada()
@@ -257,8 +257,12 @@ class W3DSGetSceneHandler(Component):
         for of in outfiles:
             print "attaching file: ", of
             result_set.append(ResultFile(of, filename=os.path.split(of)[1], content_type="application/octet-stream"))
-        pdb.set_trace()
-        return to_http_response(result_set)
+#        pdb.set_trace()
+
+        print "removing %s"%output_dir
+        response=to_http_response(result_set)
+        os.removedirs(output_dir) # remove temp directory 
+        return response
         
         #return "".join(response)
 
