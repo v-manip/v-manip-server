@@ -31,9 +31,10 @@ from bboxclip import clipPolylineBoundingBoxOnSphere, BoundingBox, v2dp
 
 class W3DSGetSceneKVPDecoder(kvp.Decoder):
     #crs = kvp.Parameter()
-    #layers = kvp.Parameter(type=typelist(",", str))
-    bbox = kvp.Parameter(type=parse_bbox, num=1)
     # look at getscene parameter
+    boundingBox = kvp.Parameter(type=parse_bbox, num=1)
+    layer = kvp.Parameter(type=typelist(str, ","), num=1)
+    time   = kvp.Parameter(type=parse_time, num="?")
 
 
 # handler definition
@@ -62,6 +63,11 @@ class W3DSGetSceneHandler(Component):
         converter_path="/vagrant/shares/lib/collada2gltf"
         
         decoder = W3DSGetSceneKVPDecoder(request.GET)
+        print "Layer: %s"%decoder.layer
+        print "Bounding box: ", decoder.boundingBox
+        print "Time from ", decoder.time.low, " to ", decoder.time.high
+        #pdb.set_trace()
+        
         TextureResolutionPerTile = 256
         GeometryResolutionPerTile = 16
         MaximalCurtainsPerResponse = 32
@@ -79,13 +85,11 @@ class W3DSGetSceneHandler(Component):
         response = []
         result_set = []
 
-        #bbox=Polygon.from_bbox((31, -60, 37, -40))
-        bbox=Polygon.from_bbox(tuple(decoder.bbox))
-        mybbox=BoundingBox(decoder.bbox[0], decoder.bbox[1], decoder.bbox[2], decoder.bbox[3])
+        bbox=Polygon.from_bbox(tuple(decoder.boundingBox))
+        mybbox=BoundingBox(decoder.boundingBox[0], decoder.boundingBox[1], decoder.boundingBox[2], decoder.boundingBox[3])
         # use a minimal step size of (diagonal of bbox) / GeometryResolutionPerTile
-        #minimalStepSize = great circle diagonal of bbox / GeometryResolutionPerTile
-        minimalStepSize = v2dp(decoder.bbox[0], decoder.bbox[1], 0.0).great_circle_distance(
-            v2dp(decoder.bbox[2], decoder.bbox[3], 0.0)) / GeometryResolutionPerTile
+        minimalStepSize = v2dp(decoder.boundingBox[0], decoder.boundingBox[1], 0.0).great_circle_distance(
+            v2dp(decoder.boundingBox[2], decoder.boundingBox[3], 0.0)) / GeometryResolutionPerTile
         response.append( "minimal step size: %6.4f<br>" % minimalStepSize )
 
         # iterate over all "curtain" coverages
@@ -112,14 +116,14 @@ class W3DSGetSceneHandler(Component):
             # map range of texture and convert to png
             #(width, height) = mapimage(in_name, out_name, min_level, max_level)
 #            result_set.append(ResultFile(out_name, filename=out_name, content_type="application/octet-stream"))
-		    textureImage = Image.open(in_name)
-		    (width, height) = textureImage.size
-		    if textureImage.mode == 'F':  # still a float image: (we expect 8bit)
-		        # map a subrange of a float image to an 8 bit PNG
-		        i = np.array(list(textureImage.getdata())).reshape(textureImage.size[::-1])
-		        g = np.divide(np.subtract(i, min_level), (max_level - min_level) / 255.0)
-		        g[g < 0] = 0
-		        textureImage = Image.fromarray(g.astype(np.uint8), 'L')
+            textureImage = Image.open(in_name)
+            (width, height) = textureImage.size
+            if textureImage.mode == 'F':  # still a float image: (we expect 8bit)
+                # map a subrange of a float image to an 8 bit PNG
+                i = np.array(list(textureImage.getdata())).reshape(textureImage.size[::-1])
+                g = np.divide(np.subtract(i, min_level), (max_level - min_level) / 255.0)
+                g[g < 0] = 0
+                textureImage = Image.fromarray(g.astype(np.uint8), 'L')
             
             # open it with GDAL to get the width/height of the raster
             # ds = gdal.Open(raster_item.location)
@@ -195,7 +199,7 @@ class W3DSGetSceneHandler(Component):
                         # now build the geometry
                         t=trianglestrip()
                         for p in pl:
-		                    u = p.u
+                            u = p.u
                             u_min = min (u_min, u)
                             u_max = max (u_max, u)
 
@@ -211,11 +215,11 @@ class W3DSGetSceneHandler(Component):
                             for p in pl:
                                 x=p.x
                                 y=p.y
-		                        u = (p.u / u_scale + u_min) / (width + 1)  # normalize u to range [0,1]
-		                        print ("U(%5.2f %5.2f) X, Y=(%5.2f,%5.2f), " % (p.u, u, x, y))
-		                        point = geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.min())))
+                                u = (p.u / u_scale + u_min) / (width + 1)  # normalize u to range [0,1]
+                                #print ("U(%5.2f %5.2f) X, Y=(%5.2f,%5.2f), " % (p.u, u, x, y))
+                                point = geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.min())))
                                 t.add_point(point, [u, 0], [0, 0, 1])
-		                        point = geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.max() * exaggeration)))
+                                point = geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.max() * exaggeration)))
                                 t.add_point(point, [u, 1], [0, 0, 1])
                             n=n+1
                             # put everything in a geometry node
@@ -239,7 +243,7 @@ class W3DSGetSceneHandler(Component):
 
         textureImage = textureImage.resize((int(round(width)), int(round(height))), Image.ANTIALIAS)
         textureImage.save(out_name, "PNG")
-	    print
+        print
 
         # put all the geometry nodes in a scene node
         node = scene.Node("node0", children=geom_nodes)
