@@ -104,7 +104,7 @@ class W3DSGetSceneHandler(Component):
             raster_item = coverage.data_items.get(
                 semantic__startswith="bands"
             )
-
+            #pdb.set_trace()
             in_name=raster_item.location        # texture file name
             # construct the texture names for conversion
             #basename=os.path.basename(in_name)
@@ -224,6 +224,8 @@ class W3DSGetSceneHandler(Component):
                             n=n+1
                             # put everything in a geometry node
                             geomnode = t.make_geometry(mesh, "Strip-%d-" % n + name,
+                                                        # return time interval as meta data appended in geometry id
+                                                       "%s-%s_%s"%(name, coverage.begin_time.isoformat(), coverage.end_time.isoformat()),
                                                        matnode)  # all these pieces have the same material
                             geom_nodes.append(geomnode)
         print "min=%f, max=%f" % (u_min, u_max),
@@ -255,13 +257,14 @@ class W3DSGetSceneHandler(Component):
         out_file_gltf=os.path.join(output_dir, 'test.json')
         # now write the collada file to a temporary location
         mesh.write(out_file_dae)
-
+        pdb.set_trace()
         # and convert it to glTF
         converter_output=os.popen(converter_path+" -f "+out_file_dae+" -o "+out_file_gltf).read()
         response.append(converter_path+" -f "+out_file_dae+" -o "+out_file_gltf)
         response.append("<h3>converter output</h3><pre>")
         response.append(converter_output+"</pre>")
         #result_set.append(ResultFile(out_file_gltf, filename='test.json', content_type="application/json"))
+        os.remove(out_file_dae) # we do not need the collada file anymore
         outfiles = glob.glob(output_dir + '/*.*')
         for of in outfiles:
             print "attaching file: ", of

@@ -16,7 +16,7 @@ class trianglestrip:
         self.__UVs.extend(UV)
         self.__normals.extend(normal)
 
-    def make_geometry(self, mesh, name, matnode):
+    def make_geometry(self, mesh, name, id, matnode):
         assert (self._point_count > 3)
         coords_name = name + "-verts-array"
         UVs_name = name + "-UVs-array"
@@ -24,7 +24,8 @@ class trianglestrip:
         vert_src = source.FloatSource(coords_name, np.array(self.__coords), ('X', 'Y', 'Z'))
         UV_src = source.FloatSource(UVs_name, np.array(self.__UVs), ('U', 'V'))
         normal_src = source.FloatSource(normals_name, np.array(self.__normals), ('X', 'Y', 'Z'))
-        geom = geometry.Geometry(mesh, name + "-geometry", name,
+        geom = geometry.Geometry(mesh, name + "-geometry", 
+                                 id, # use separate id for additional meta data (e.g. time)
                                  [vert_src, normal_src, UV_src])  # material overrides double_sided
         indices = []
         for p in xrange(3, self._point_count + 1):
