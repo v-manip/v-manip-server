@@ -3,6 +3,7 @@
 import pdb
 import glob
 #import pudb
+import tempfile
 
 #imports
 from eoxserver.core import Component, implements, ExtensionPoint
@@ -23,30 +24,19 @@ from vmanip_server.mesh_factory.ows.w3ds.interfaces import SceneRendererInterfac
 from collada import *
 import os
 from collada_helper import trianglestrip, make_emissive_material
-#from PIL import Image
 import Image
 import geocoord
 from bboxclip import clipPolylineBoundingBoxOnSphere, BoundingBox, v2dp
+from uuid import uuid4
 
-# map a subrange of a float image to an 8 bit PNG
-# and write it to disk
-#
-#  returns size of image
-def mapimage(infile, outfile, lmin, lmax):
-    im = Image.open(infile)
-    i=np.array(list(im.getdata())).reshape(im.size[::-1])
-    g=np.divide(np.subtract(i,lmin), (lmax-lmin)/255.0)
-    g[g<0]=0
-    iout=Image.fromarray(g.astype(np.uint8), 'L')
-    iout.save(outfile, "PNG")
-    print "Saving to: %s"%outfile
-    return im.size
 
 class W3DSGetSceneKVPDecoder(kvp.Decoder):
     #crs = kvp.Parameter()
-    #layers = kvp.Parameter(type=typelist(",", str))
-    bbox = kvp.Parameter(type=parse_bbox, num=1)
     # look at getscene parameter
+    boundingBox = kvp.Parameter(type=parse_bbox, num=1)
+    layer = kvp.Parameter(type=typelist(str, ","), num=1)
+    time   = kvp.Parameter(type=parse_time, num="?")
+
 
 # handler definition
 
@@ -69,20 +59,23 @@ class W3DSGetSceneHandler(Component):
 
         min_level = -40 # maps to 0 in output texture
         max_level =  50 # maps to 255 in output texture
-        exaggeration = 40 # multiplier for curtain height in visualization
-        output_dir="/var/data/glTF"
+        exaggeration = 5 # multiplier for curtain height in visualization
+        
         # converter_path="/vagrant/shares/lib/collada2gltf"
         converter_path="/var/lib/collada2gltf"
         
         decoder = W3DSGetSceneKVPDecoder(request.GET)
+        print "Layer: %s"%decoder.layer
+        print "Bounding box: ", decoder.boundingBox
+        print "Time from ", decoder.time.low, " to ", decoder.time.high
+        #pdb.set_trace()
+        
         TextureResolutionPerTile = 256
         GeometryResolutionPerTile = 16
         MaximalCurtainsPerResponse = 32
 
-
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-
+        output_dir=tempfile.mkdtemp(prefix='tmp_meshfactory_')
+        print "creating %s"%output_dir
 
         # create new collada scene
         mesh = Collada()
@@ -93,137 +86,154 @@ class W3DSGetSceneHandler(Component):
         response = []
         result_set = []
 
-        #bbox=Polygon.from_bbox((31, -60, 37, -40))
-        bbox=Polygon.from_bbox(tuple(decoder.bbox))
-        mybbox=BoundingBox(decoder.bbox[0], decoder.bbox[1], decoder.bbox[2], decoder.bbox[3])
+        bbox=Polygon.from_bbox(tuple(decoder.boundingBox))
+        mybbox=BoundingBox(decoder.boundingBox[0], decoder.boundingBox[1], decoder.boundingBox[2], decoder.boundingBox[3])
         # use a minimal step size of (diagonal of bbox) / GeometryResolutionPerTile
-        #minimalStepSize = great circle diagonal of bbox / GeometryResolutionPerTile
-        minimalStepSize = v2dp(decoder.bbox[0], decoder.bbox[1], 0.0).great_circle_distance(v2dp(decoder.bbox[2], decoder.bbox[3], 0.0)) / GeometryResolutionPerTile
+        minimalStepSize = v2dp(decoder.boundingBox[0], decoder.boundingBox[1], 0.0).great_circle_distance(
+            v2dp(decoder.boundingBox[2], decoder.boundingBox[3], 0.0)) / GeometryResolutionPerTile
         response.append( "minimal step size: %6.4f<br>" % minimalStepSize )
 
         # iterate over all "curtain" coverages
-        #for coverage in models.CurtainCoverage.objects.all():
-        for coverage in models.CurtainCoverage.objects.filter(footprint__intersects=bbox):
+        for l in decoder.layer:
+            layer = models.DatasetSeries.objects.get(identifier=l)
 
-            # write the ID of the coverage
-            response.append("%s: " % coverage.identifier)
-            print coverage
+            for coverage in models.CurtainCoverage.objects.filter(collections__in=[layer.pk]).filter(footprint__intersects=bbox):
 
-            # retrieve the data item pointing to the raster data
-            raster_item = coverage.data_items.get(
-                semantic__startswith="bands"
-            )
+                # write the ID of the coverage
+                response.append("%s: " % coverage.identifier)
+                print coverage
 
-            in_name=raster_item.location        # texture file name
-            # construct the texture names for conversion
-            #basename=os.path.basename(in_name)
-            (name, _) =os.path.splitext(os.path.basename(in_name)) # generate a unique identifier
-            out_name=os.path.join(output_dir, name+'.png')
-            #response.append("Input file: %s<br>" % raster_item.location)
-            #response.append("Output file: %s<br>" % out_name)
-            #response.append("ID: %s<br>" % name)
-            # map range of texture and convert to png
-            (width, height)=mapimage(in_name, out_name, min_level, max_level)
-#            result_set.append(ResultFile(out_name, filename=out_name, content_type="application/octet-stream"))
-            
-            # open it with GDAL to get the width/height of the raster
-            # ds = gdal.Open(raster_item.location)
-            # width=ds.RasterXSize
-            # height=ds.RasterYSize
+                # retrieve the data item pointing to the raster data
+                raster_item = coverage.data_items.get(
+                    semantic__startswith="bands"
+                )
 
-            #response.append("image width: %d, height: %d<br/>" % (width, height))
+                in_name=raster_item.location        # texture file name
+                # construct the texture names for conversion
+                (name, _) =os.path.splitext(os.path.basename(in_name)) # generate a unique identifier
+                out_name=os.path.join(output_dir, name+'.png')
+                textureImage = Image.open(in_name)
+                (width, height) = textureImage.size
+                if textureImage.mode == 'F':  # still a float image: (we expect 8bit)
+                    # map a subrange of a float image to an 8 bit PNG
+                    i = np.array(list(textureImage.getdata())).reshape(textureImage.size[::-1])
+                    g = np.divide(np.subtract(i, min_level), (max_level - min_level) / 255.0)
+                    g[g < 0] = 0
+                    textureImage = Image.fromarray(g.astype(np.uint8), 'L')
+                
+                # open it with GDAL to get the width/height of the raster
+                # ds = gdal.Open(raster_item.location)
+                # width=ds.RasterXSize
+                # height=ds.RasterYSize
 
-            # retrieve the data item pointing to the height values/levels
-            height_values_item = coverage.data_items.get(
-                semantic__startswith="heightvalues"
-            )
+                # retrieve the data item pointing to the height values/levels
+                height_values_item = coverage.data_items.get(
+                    semantic__startswith="heightvalues"
+                )
 
-            # retrieve the data item pointing to the coordinates
-            gcps_item = coverage.data_items.get(
-                semantic__startswith="gcps"
-            )
+                # retrieve the data item pointing to the coordinates
+                gcps_item = coverage.data_items.get(
+                    semantic__startswith="gcps"
+                )
 
 
-            # load the json files to lists
-            with open(height_values_item.location) as f:
-                height_values = json.load(f)
-            heightLevelsList=np.array(height_values)
+                # load the json files to lists
+                with open(height_values_item.location) as f:
+                    height_values = json.load(f)
+                heightLevelsList=np.array(height_values)
 
-            with open(gcps_item.location) as f:
-                gcps = json.load(f)
+                with open(gcps_item.location) as f:
+                    gcps = json.load(f)
 
-            coords=np.array(gcps)
-            X=coords[:,0]
-            Y=coords[:,1]
-            # write out the coordinates
-            response.append("%d coordinates (Xmin: %d, Xmax: %d, Ymin: %d, Ymax: %d), %d height levels (min: %d, max: %d)<br/>" % (len(gcps), X.min(), X.max(), Y.min(), Y.max(),len(height_values), heightLevelsList.min(), heightLevelsList.max()))
-            # create a unique material for each texture
-            matnode = make_emissive_material(mesh, "Material-"+name, name+".png")
+                coords=np.array(gcps)
+                X=coords[:,0]
+                Y=coords[:,1]
+                # write out the coordinates
+                response.append(
+                    "%d coordinates (Xmin: %d, Xmax: %d, Ymin: %d, Ymax: %d), %d height levels (min: %d, max: %d)<br/>" % (
+                        len(gcps), X.min(), X.max(), Y.min(), Y.max(), len(height_values), heightLevelsList.min(),
+                        heightLevelsList.max()))
 
-            # now build the geometry
-            #pdb.set_trace()
+                # now build the geometry:
 
-            # stuff curtain piece footprint in polyline
-            polyline=list()
-            #UVXY = np.hstack((colRowList, coordList))
-            
-            #print "length=%d nodes, " % g.shape[0],
-            # noinspection PyRedeclaration
-            #[u, v, x, y] = UVXY[0]
-            [x, y, u, v]  = gcps[0]
-            previous_position = v2dp(x, y, u)
-            polyline.append(v2dp(x, y, u))  # insert first ColRow entry
-            for [x, y, u, v] in gcps[1:-1]:  # loop over inner ColRows
-                position = v2dp(x, y, u)
-                if position.great_circle_distance(previous_position) >= minimalStepSize:
-                    polyline.append(position)  # append only ColRows with minimal step size
-                    previous_position = position
-            #[u, v, x, y] = UVXY[-1]
-            [x, y, u, v]  = gcps[-1]
-            polyline.append(v2dp(x, y, u))  # insert last ColRow entry
-            print "- %d nodes, length curtain = %6.3f" % (len(polyline), polyline[0].great_circle_distance(polyline[-1]))
+                # stuff curtain piece footprint in polyline
+                polyline=list()
+                [x, y, u, v]  = gcps[0]
+                previous_position = v2dp(x, y, u)
+                polyline.append(v2dp(x, y, u))  # insert first ColRow entry
+                for [x, y, u, v] in gcps[1:-1]:  # loop over inner ColRows
+                    position = v2dp(x, y, u)
+                    if position.great_circle_distance(previous_position) >= minimalStepSize:
+                        polyline.append(position)  # append only ColRows with minimal step size
+                        previous_position = position
+                #[u, v, x, y] = UVXY[-1]
+                [x, y, u, v]  = gcps[-1]
+                polyline.append(v2dp(x, y, u))  # insert last ColRow entry
+                print "- %d nodes, length curtain = %6.3f" % (
+                    len(polyline), polyline[0].great_circle_distance(polyline[-1]))
 
-             # clip curtain on bounding box
-            polylist=clipPolylineBoundingBoxOnSphere(polyline, mybbox)
+                 # clip curtain on bounding box
+                polylist=clipPolylineBoundingBoxOnSphere(polyline, mybbox)
 
-            u_min = sys.float_info.max
-            u_max = -sys.float_info.max
-            print " width=%d"%width
-            if len(polylist)>0:
-                # determine texture coordinate U range
-                for pl in polylist:
-                    if len(pl)>0:
-                        # now build the geometry
-                        t=trianglestrip()
-                        for p in pl:
-                            u=p.u / (width+1) # this is not correct, need to be in the middle of the texel
-                            u_min = min (u_min, u)
-                            u_max = max (u_max, u)
-
-                response.append("U: min=%f, max=%f<br>"%(u_min, u_max))
-                u_scale=u_max-u_min
-                # convert all clipped polylines to triangle strips
-                n=0
-                if (u_scale>sys.float_info.min):
+                u_min = sys.float_info.max
+                u_max = -sys.float_info.max
+                print " width=%d"%width
+                if len(polylist)>0:
+                    # create a unique material for each texture
+                    matnode = make_emissive_material(mesh, "Material-"+name, name+".png")
+                    # determine texture coordinate U range
                     for pl in polylist:
                         if len(pl)>0:
                             # now build the geometry
                             t=trianglestrip()
                             for p in pl:
-                                x=p.x
-                                y=p.y
-                                u=p.u / (width+1) / u_scale + u_min # this is not correct, need to be in the middle of the texel
-                                #response.append("U(%5.2f %5.2f) X, Y=(%5.2f,%5.2f), "%(p.u, u, x, y))
-                                point=geocoord.fromGeoTo3D(np.array((x, heightLevelsList.min(), y)))
-                                t.add_point(point, [u, 0], [0, 0, 1])
-                                point=geocoord.fromGeoTo3D(np.array((x, heightLevelsList.max()*exaggeration, y)))
-                                t.add_point(point, [u, 1], [0, 0, 1])
-                            n=n+1
-                            # put everything in a geometry node
-                            geomnode=t.make_geometry(mesh, "Strip-%d-"%n+name, matnode) # all these pieces have the same material
-                            geom_nodes.append(geomnode)
+                                u = p.u
+                                u_min = min (u_min, u)
+                                u_max = max (u_max, u)
 
-        #pdb.set_trace()
+                    response.append("U: min=%f, max=%f<br>"%(u_min, u_max))
+                    u_scale=u_max-u_min
+                    # convert all clipped polylines to triangle strips
+                    n=0
+                    if (u_scale>sys.float_info.min):
+                        for pl in polylist:
+                            if len(pl)>0:
+                                # now build the geometry
+                                t=trianglestrip()
+                                for p in pl:
+                                    x=p.x
+                                    y=p.y
+                                    u = (p.u / u_scale + u_min) / (width + 1)  # normalize u to range [0,1]
+                                    #print ("U(%5.2f %5.2f) X, Y=(%5.2f,%5.2f), " % (p.u, u, x, y))
+                                    point = geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.min())))
+                                    t.add_point(point, [u, 0], [0, 0, 1])
+                                    point = geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.max() * exaggeration)))
+                                    t.add_point(point, [u, 1], [0, 0, 1])
+                                n=n+1
+                                # put everything in a geometry node
+                                geomnode = t.make_geometry(mesh, "Strip-%d-" % n + name,
+                                                            # return time interval as meta data appended in geometry id
+                                                           "%s-%s_%s"%(name, coverage.begin_time.isoformat(), coverage.end_time.isoformat()),
+                                                           matnode)  # all these pieces have the same material
+                                geom_nodes.append(geomnode)
+                    print "min=%f, max=%f" % (u_min, u_max),
+
+                    # now crop the image to the resolution we need:
+                    textureImage = textureImage.crop((int(round(u_min)), 0, int(round(u_max)) + 1, height))
+
+                    # and resize it to the maximum allowed tile size
+                    (width, height) = textureImage.size
+                    if width > TextureResolutionPerTile:
+                        height = float(height) * float(TextureResolutionPerTile) / float(width)
+                        width = float(TextureResolutionPerTile)
+
+                    if height > TextureResolutionPerTile:
+                        height = float(TextureResolutionPerTile)
+                        width = float(width) * float(TextureResolutionPerTile) / float(height)
+
+                    textureImage = textureImage.resize((int(round(width)), int(round(height))), Image.ANTIALIAS)
+                    textureImage.save(out_name, "PNG")
+                    print
 
         # put all the geometry nodes in a scene node
         node = scene.Node("node0", children=geom_nodes)
@@ -231,8 +241,9 @@ class W3DSGetSceneHandler(Component):
         mesh.scenes.append(myscene)
         mesh.scene = myscene
 
-        out_file_dae=os.path.join(output_dir, 'test.dae')
-        out_file_gltf=os.path.join(output_dir, 'test.json')
+        id = str(uuid4())
+        out_file_dae=os.path.join(output_dir, id + '_test.dae')
+        out_file_gltf=os.path.join(output_dir, id + '_test.json')
         # now write the collada file to a temporary location
         mesh.write(out_file_dae)
 
@@ -241,68 +252,19 @@ class W3DSGetSceneHandler(Component):
         response.append(converter_path+" -f "+out_file_dae+" -o "+out_file_gltf)
         response.append("<h3>converter output</h3><pre>")
         response.append(converter_output+"</pre>")
-        #result_set.append(ResultFile(out_file_gltf, filename='test.json', content_type="application/json"))
+        os.remove(out_file_dae) # we do not need the collada file anymore
+        
+        # now put all files generated by the converter in the multipart response
         outfiles = glob.glob(output_dir + '/*.*')
         for of in outfiles:
             print "attaching file: ", of
-            
             result_set.append(ResultFile(of, filename=os.path.split(of)[1], content_type="application/octet-stream"))
+#        pdb.set_trace()
 
-        #return to_http_response(result_set)
+        print "removing %s"%output_dir
+        response=to_http_response(result_set)
+        os.removedirs(output_dir) # remove temp directory 
+        return response
         
-        return "".join(response)
-
-
-        #return "\n".join(map(lambda c: c.identifier, models.CurtainCoverage.objects.all()))
-        #return """Response for GetScene Request"""
-
-        '''
-        # Pseudocode
-        # request is a Django HTTPRequest object
-
-        if error:
-            raise Exception() # should be passed to the exceptionhandler
-
-        # attention, pseudo code
-
-        decoder = W3DSGetSceneKVPDecoder(request.GET)
-
-        layers = decoder.layers
-
-        scene = Scene()
-
-
-        renderer = get_renderer(request)
-
-        coverages = []
-        for layer in layers:
-            # retrieve coverage from DB
-            coverages.append(models.Coverage.objects.get(identifier=layer))
-
-        parameters = {
-            "bbox": ...
-            "minheight": ..
-
-        }
-        renderer.render_scene(coverages, parameters)
-
-
-
-
-
-        # encode "scene" according to decoder.format
-        encoder = self.get_scene_renderer(decoder.format)
-        return encoder.encode_scene(scene), encoder.content_type
-
-    def get_scene_renderer(self, format):
-        for renderer in self.renderers:
-            if format in renderer.formats:
-                return renderer
-
-        raise Exception("Format %s not supported" % format)
-
-
-
-
-    '''
+        #return "".join(response)
 
