@@ -75,7 +75,7 @@ class W3DSGetTileHandler(Component):
 
         mesh_cache = MeshCache()
         tile_geo = mesh_cache.lookup(layer, grid, level, col, row, time)
-        
+
         # FIXXME: debugging only!
         # tile_geo = False
 
@@ -84,7 +84,7 @@ class W3DSGetTileHandler(Component):
             tile_geo = mesh_cache.request_and_store(layer, grid, level, col, row, time)
 
             # print 'TILE_GEO: ', tile_geo
-            
+
             if not tile_geo:
                 raise Exception('Could not request data from source (MeshFactory)')
 

@@ -59,7 +59,7 @@ class W3DSGetSceneHandler(Component):
 
         min_level = -40 # maps to 0 in output texture
         max_level =  50 # maps to 255 in output texture
-        exaggeration = 5 # multiplier for curtain height in visualization
+        exaggeration = 30 # multiplier for curtain height in visualization
         
         # converter_path="/vagrant/shares/lib/collada2gltf"
         converter_path="/var/lib/collada2gltf"
@@ -191,7 +191,7 @@ class W3DSGetSceneHandler(Component):
                                 u_min = min (u_min, u)
                                 u_max = max (u_max, u)
 
-                    response.append("U: min=%f, max=%f<br>"%(u_min, u_max))
+                    print "U: min=%f, max=%f"%(u_min, u_max)
                     u_scale=u_max-u_min
                     # convert all clipped polylines to triangle strips
                     n=0
@@ -203,7 +203,7 @@ class W3DSGetSceneHandler(Component):
                                 for p in pl:
                                     x=p.x
                                     y=p.y
-                                    u = (p.u / u_scale + u_min) / (width + 1)  # normalize u to range [0,1]
+                                    u = (p.u / u_scale + u_min)  # normalize u to range [0,1]
                                     #print ("U(%5.2f %5.2f) X, Y=(%5.2f,%5.2f), " % (p.u, u, x, y))
                                     point = geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.min())))
                                     t.add_point(point, [u, 0], [0, 0, 1])

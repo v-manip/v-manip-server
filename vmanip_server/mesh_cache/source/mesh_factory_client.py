@@ -29,6 +29,10 @@
 from __future__ import division
 from eoxserver.core.util import multiparttools as mp
 import urllib2
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 class MeshFactoryClient(object):
@@ -36,11 +40,22 @@ class MeshFactoryClient(object):
         self.host = host
 
     def request_files(self, layer, grid, level, col, row, time):
-        bbox_str = self._convert_tile_params_to_scene_bbox_string(level, col, row)
+        bbox = self._convert_tile_params_to_scene_bbox(level, col, row)
 
-        # FIXXME: after a refactoring of gettile.py into at least a separated MeshCache class the baseurl should be a parameter of this class!
+        # from the W3DS standard draft:
+        # "The value of the BoundingBox parameter is a list of comma-separated real
+        # numbers in the form 'minx,miny,maxx,maxy'."
+        bbox_str = '%s,%s,%s,%s' % (bbox['west'], bbox['south'], bbox['east'], bbox['north'])
+
+        # NOTE: The MeshFactory does not take into account the timespan, it
+        # delivers all data (timewise) for a given tile.
+        #time = '2013-05-17T11:10:34.000Z/2013-05-17T11:26:18.000Z'
+
+        # FIXXME: those parameters should be configurable!
         baseurl = self.host + '/ows?service=W3DS&request=GetScene&version=1.0.0&crs=WGS84&format=model/gltf'
         url = '{0}&layer={1}&boundingBox={2}&time={3}'.format(baseurl, layer, bbox_str, time)
+
+        # logger.debug('URL: %s' % (url,))
 
         response = urllib2.urlopen(url)
         files = self._extract_files_from_response(response)
@@ -48,6 +63,7 @@ class MeshFactoryClient(object):
 
         return files
 
+    # TODO: do code cleanup!
     def _extract_files_from_response(self, response):
         files = []
 
@@ -76,11 +92,10 @@ class MeshFactoryClient(object):
 
         data = response.read()
 
-        print '2: ', boundary
+        # print 'BOUNDARY: ', boundary
         raw_data = mp.mpUnpack(data, boundary)
-        print '3'
 
-        print('#files in response: ' + str(len(raw_data)))
+        # print('#files in response: ' + str(len(raw_data)))
 
         for file_info in raw_data:
             info = file_info[0]
@@ -97,7 +112,7 @@ class MeshFactoryClient(object):
             file_info['buffer'] = filebuffer
             files.append(file_info)
 
-            print('filename: ' + filename)
+            # print('filename: ' + filename)
 
             # print('Offset:' + str(offset))
             # print('Length:' + str(length))
@@ -107,13 +122,19 @@ class MeshFactoryClient(object):
 
         return files
 
-    def _convert_tile_params_to_scene_bbox_string(self, level, col, row):
-        # NOTE: This setting has to be adapted to the grid schema the web-client is using!
-        level_0_num_tiles_x = 4  # cols
+    def _convert_tile_params_to_scene_bbox(self, level, col, row):
+        # NOTE: This setting has to be adapted to the tiling schema the web-client
+        # is using. We are using those values as level_0 (reflected in the
+        # calculation below, where 'level-1' is used), however, other schemas
+        # are starting with half of the tiles (1 row, 2 cols) as level_0.
+        # FIXXME: those parameters should be configurable!
         level_0_num_tiles_y = 2  # rows
+        level_0_num_tiles_x = 4  # cols
 
-        tile_width = 360 / (level_0_num_tiles_x * pow(2, level))
-        tile_height = 180 / (level_0_num_tiles_y * pow(2, level))
+        # NOTE: Depending on the tiling schema and the number of level_0 tiles
+        # the current division through 'level-1' has to be adapted.
+        tile_width = 360 / (level_0_num_tiles_x * pow(2, level-1))
+        tile_height = 180 / (level_0_num_tiles_y * pow(2, level-1))
 
         # print 'tile_width  (level: ' + str(level) + ') = ' + str(tile_width)
         # print 'tile_height (level: ' + str(level) + ') = ' + str(tile_height)
@@ -123,7 +144,4 @@ class MeshFactoryClient(object):
         north = 90 - (row * tile_height)
         south = north - tile_height
 
-        # from the W3DS standard draft:
-        # "The value of the BoundingBox parameter is a list of comma-separated real
-        # numbers in the form 'minx,miny,maxx,maxy'."
-        return str(west) + ',' + str(south) + ',' + str(east) + ',' + str(north)
+        return {'west': west, 'south': south, 'east': east, 'north': north}
