@@ -59,7 +59,7 @@ class W3DSGetSceneHandler(Component):
 
         min_level = -40 # maps to 0 in output texture
         max_level =  50 # maps to 255 in output texture
-        exaggeration = 5 # multiplier for curtain height in visualization
+        exaggeration = 30 # multiplier for curtain height in visualization
         
         # converter_path="/vagrant/shares/lib/collada2gltf"
         converter_path="/var/lib/collada2gltf"
