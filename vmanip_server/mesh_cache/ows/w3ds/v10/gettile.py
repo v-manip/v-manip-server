@@ -59,17 +59,17 @@ class W3DSGetTileHandler(Component):
     def handle(self, request):
         decoder = W3DSGetTileKVPDecoder(request.GET)
 
-        # magic cookie:
-        if decoder.tilelevel == 9999:
-            self.seed()
-            return ('{ "status:" "seeding" }', 'application/json')
-
         layer = decoder.layer
         grid = decoder.crs
         level = decoder.tilelevel
         col = decoder.tilecol
         row = decoder.tilerow
         time = decoder.time
+
+        # magic cookie:
+        if decoder.tilelevel == 9999:
+            self.seed(layer, grid, range(0, 4), time)
+            return ('{ "status:" "finished seeding" }', 'application/json')
 
         logger.debug('[W3DSGetTileHandler::handle] %s / %s / %s / %s / %s / %s' % (layer, grid, level, col, row, time))
 
@@ -92,6 +92,15 @@ class W3DSGetTileHandler(Component):
 
         return (tile_geo, 'application/json')
 
-    def seed(self):
-        for i in range(4):
-            print 'seeding: ', i
+    def seed(self, layer, grid, level_range, time):
+        level_0_num_tiles_y = 2  # rows
+        level_0_num_tiles_x = 4  # cols
+
+        mesh_cache = MeshCache()
+
+        for level in level_range:
+            for row in range(0, pow(level_0_num_tiles_y, level)):
+                for col in range(0, pow(level_0_num_tiles_x, level)):
+                    logger.debug('[W3DSGetTileHandler::seed] processing %s / %s / %s / %s / %s/ %s' % (layer, grid, level, col, row, time))
+                    if not mesh_cache.lookup(layer, grid, level, col, row, time):
+                        mesh_cache.request_and_store(layer, grid, level, col, row, time)
