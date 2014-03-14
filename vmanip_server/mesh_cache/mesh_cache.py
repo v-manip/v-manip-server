@@ -28,6 +28,7 @@
 
 from vmanip_server.mesh_cache.source.mesh_factory_client import MeshFactoryClient
 from vmanip_server.mesh_cache.backend.mapcache_sqlite import MapCacheSQLite
+import os
 import logging
 
 
@@ -39,6 +40,10 @@ class MeshCache(object):
         # FIXXME: get parameters from config!
         self.cache = MapCacheSQLite('/var/www/cache')
         self.source = MeshFactoryClient('http://localhost:8000')
+        self.gltf_folder = '/var/www/cache/gltf/'
+
+        if not os.path.exists(self.gltf_folder):
+            os.makedirs(self.gltf_folder)
 
     def lookup(self, layer, grid, level, col, row, time):
         logger.info('[MeshCache::lookup] Tile parameters: %s / %s / %s / %s'
@@ -56,13 +61,15 @@ class MeshCache(object):
         tilesets = self._convert_files_to_tilesets(files)
         tile_geo = self.cache.store(layer, grid, level, col, row, time, tilesets)
 
-        # FIXXME: temporary debugging thingy...
+        # FIXXME: Currently dependent glTF files are simply written to a folder on the server. The
+        # .json file links to the published endpoint of this folder. In future the dependent files
+        # will also be stored in the sqlite-db!
         for file in files:
-            target = open('/vagrant/shares/gltf/' + file['name'], 'w')
+            target = open(self.gltf_folder + file['name'], 'w')
 
             # target.write(file['buffer'].replace('"path": "', '"path": "http://localhost:3080/gltf/'))
             target.write(file['buffer'])
-            logger.info('Wrote to: ' + '/vagrant/shares/gltf/' + file['name'])
+            # logger.info('Wrote to: ' + self.gltf_folder + file['name'])
 
         return tile_geo
 
