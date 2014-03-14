@@ -42,8 +42,14 @@ class MeshCache(object):
         self.source = MeshFactoryClient('http://localhost:8000')
         self.gltf_folder = '/var/www/cache/gltf/'
 
-        if not os.path.exists(self.gltf_folder):
-            os.makedirs(self.gltf_folder)
+        try:
+            if not os.path.exists(self.gltf_folder):
+                print '[MeshCache] creating gltf folder in: ' + str(self.gltf_folder)
+                os.makedirs(self.gltf_folder)
+        except:
+            # FIXXME: not so beautiful, but it catches an exception when multiple requests
+            # want to create the folder simultaneously
+            pass
 
     def lookup(self, layer, grid, level, col, row, time):
         logger.info('[MeshCache::lookup] Tile parameters: %s / %s / %s / %s'
