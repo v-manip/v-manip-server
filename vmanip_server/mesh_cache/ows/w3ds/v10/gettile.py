@@ -68,7 +68,7 @@ class W3DSGetTileHandler(Component):
 
         # magic cookie:
         if decoder.tilelevel == 9999:
-            self.seed(layer, grid, range(0, 4), time)
+            self.seed(layer, grid, range(0, 6), time)
             return ('{ "status:" "finished seeding" }', 'application/json')
 
         logger.debug('[W3DSGetTileHandler::handle] %s / %s / %s / %s / %s / %s' % (layer, grid, level, col, row, time))

@@ -62,8 +62,8 @@ class W3DSGetSceneHandler(Component):
         max_level =  50 # maps to 255 in output texture
         exaggeration = 10 # multiplier for curtain height in visualization
         
-        converter_path="/vagrant/shares/lib/collada2gltf"
-        # converter_path="/var/lib/collada2gltf"
+        # converter_path="/vagrant/shares/lib/collada2gltf"
+        converter_path="/var/lib/collada2gltf"
         
         decoder = W3DSGetSceneKVPDecoder(request.GET)
         print "Layer: %s"%decoder.layer
