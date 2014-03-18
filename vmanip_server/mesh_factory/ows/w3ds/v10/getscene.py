@@ -63,7 +63,7 @@ class W3DSGetSceneHandler(Component):
         exaggeration = 10 # multiplier for curtain height in visualization
         
         # converter_path="/vagrant/shares/lib/collada2gltf"
-        converter_path="/var/lib/gltf/collada2gltf"
+        converter_path="/var/vmanip/lib/collada2gltf"
         
         decoder = W3DSGetSceneKVPDecoder(request.GET)
         print "Layer: %s"%decoder.layer
