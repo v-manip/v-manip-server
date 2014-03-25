@@ -66,10 +66,13 @@ class W3DSGetTileHandler(Component):
         row = decoder.tilerow
         time = decoder.time
 
-        # magic cookie:
-        if decoder.tilelevel == 9999:
-            self.seed(layer, grid, range(0, 6), time)
-            return ('{ "status:" "finished seeding" }', 'application/json')
+        print 'level: ' + str(level)
+
+        # magic seeding request:
+        if level == 9999:
+            logger.debug('[W3DSGetTileHandler::handle] started seeding for levels %s-%s:' % (col, row))
+            self.seed(layer, grid, range(col, row), time)
+            return ('{ "status:" "finished seeding of levels %s-%s" }' % (col, row), 'application/json')
 
         logger.debug('[W3DSGetTileHandler::handle] %s / %s / %s / %s / %s / %s' % (layer, grid, level, col, row, time))
 
