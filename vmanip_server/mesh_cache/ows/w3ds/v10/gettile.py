@@ -33,6 +33,7 @@ from eoxserver.services.ows.interfaces import (
 )
 from eoxserver.core.decoders import kvp
 from vmanip_server.mesh_cache.core.mesh_cache import MeshCache
+from vmanip_server.mesh_cache.core.time_slider import TimeSlider
 import logging
 
 
@@ -76,7 +77,7 @@ class W3DSGetTileHandler(Component):
 
         mesh_cache = MeshCache()
         tile_geo = mesh_cache.lookup(layer, grid, level, col, row, time)
-        
+
         if not tile_geo:
             print 'No tile geometry available, requesting from source (MeshFactory) ...'
             tile_geo = mesh_cache.request_and_store(layer, grid, level, col, row, time)
@@ -87,6 +88,11 @@ class W3DSGetTileHandler(Component):
                 raise Exception('Could not request data from source (MeshFactory)')
 
         logger.debug('[W3DSGetTileHandler::handle] returning tile_geo\n%s:' % (tile_geo,))
+
+        # FIXXME: Currently the TimeSlider object is doing the temporal trimming. The cache backend does not
+        # filter timewise yet (which is the clean solution). For now this is working as it should with the
+        # TimeSlider, the clean solution will be implemented at a later point in time.
+        tile_geo = TimeSlider().trim(tile_geo, time, '-')
 
         return (tile_geo, 'application/json')
 
