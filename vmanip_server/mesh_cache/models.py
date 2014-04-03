@@ -9,8 +9,8 @@
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-# copies of the Software, and to permit persons to whom the Software is 
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
 #
 # The above copyright notice and this permission notice shall be included in all
@@ -26,38 +26,5 @@
 #-------------------------------------------------------------------------------
 
 
-from django.db import models
 
-class Layer(models.Model):
-	name = models.CharField(max_length=256, unique=True)
-
-	def __unicode__(self):
-		return self.name
-
-class TileLevel(models.Model):
-	layer = models.ForeignKey(Layer)
-	value = models.IntegerField()
-
-	def __unicode__(self):
-		return str(self.value) + ' of layer ' + self.layer.name
-
-# TODO: not working
-# class TileLevelAdmin(admin.ModelAdmin):
-#     list_display = ('name',)
-#     search_fields = ('layers__name',)
-
-class TileCol(models.Model):
-	tilelevel = models.ForeignKey(TileLevel)
-	value = models.IntegerField()
-
-	def __unicode__(self):
-		return str(self.value) + ' of level ' + str(self.tilelevel.value) + ' of layer ' + str(self.tilelevel.layer.name)
-
-class TileRow(models.Model):
-	tilecol = models.ForeignKey(TileCol)
-	value = models.IntegerField()
-	content_file = models.TextField()
-
-	def __unicode__(self):
-		return str(self.value) + ' of level ' + str(self.tilecol.value) + ' of layer ' + self.tilecol.tilelevel.layer.name
-
+# Create your models here.

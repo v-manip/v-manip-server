@@ -32,7 +32,7 @@ from eoxserver.services.ows.interfaces import (
     ServiceHandlerInterface, GetServiceHandlerInterface
 )
 from eoxserver.core.decoders import kvp
-from vmanip_server.mesh_cache.mesh_cache import MeshCache
+from vmanip_server.mesh_cache.core.mesh_cache import MeshCache
 import logging
 
 
@@ -66,8 +66,6 @@ class W3DSGetTileHandler(Component):
         row = decoder.tilerow
         time = decoder.time
 
-        print 'level: ' + str(level)
-
         # magic seeding request:
         if level == 9999:
             logger.debug('[W3DSGetTileHandler::handle] started seeding for levels %s-%s:' % (col, row))
@@ -78,10 +76,7 @@ class W3DSGetTileHandler(Component):
 
         mesh_cache = MeshCache()
         tile_geo = mesh_cache.lookup(layer, grid, level, col, row, time)
-
-        # FIXXME: debugging only!
-        # tile_geo = False
-
+        
         if not tile_geo:
             print 'No tile geometry available, requesting from source (MeshFactory) ...'
             tile_geo = mesh_cache.request_and_store(layer, grid, level, col, row, time)

@@ -26,7 +26,7 @@
 #-------------------------------------------------------------------------------
 
 
-from vmanip_server.mesh_cache.source.mesh_factory_client import MeshFactoryClient
+from vmanip_server.mesh_cache.datasource.mesh_factory_client import MeshFactoryClient
 from vmanip_server.mesh_cache.backend.mapcache_sqlite import MapCacheSQLite
 import os
 import logging
