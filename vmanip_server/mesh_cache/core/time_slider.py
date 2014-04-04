@@ -41,16 +41,24 @@ class TimeSlider(object):
     to work the meshes in the file have to be named after with the following
     schema: ('$$$' is a delimiter that separates name and timespan)
     NAME$$$TIMESPAN, e.g.
-    'mynodename$$$2013-05-17T11:21:04+00:00_2013-05-17T11:23:40+00:00'
+    'mynodename$$$2013-05-17T11:21:04+00:00/2013-05-17T11:23:40+00:00'
+
+    If an invalid input is detected the original gltf data is returned.
     '''
 
     def trim(self, gltf_string, timespan, delimiter):
         tmp = timespan.split('/')
 
-        print('RAW TIMESPAMP FROM WEBCLIENT: ' + str(timespan))
+        if len(tmp) != 2:
+            logger.error('[TimeSlider::trim] Skipping invalid time format: ' + str(timespan))
+            return gltf_string
 
-        timespan_start = datetime.datetime.strptime(tmp[0], '%Y-%m-%dT%H:%M:%S.%fZ')
-        timespan_end = datetime.datetime.strptime(tmp[1], '%Y-%m-%dT%H:%M:%S.%fZ')
+        try:
+            timespan_start = datetime.datetime.strptime(tmp[0], '%Y-%m-%dT%H:%M:%S.%fZ')
+            timespan_end = datetime.datetime.strptime(tmp[1], '%Y-%m-%dT%H:%M:%S.%fZ')
+        except:
+            logger.error('[TimeSlider::trim] strptime exception! timespan in: %s' % (timespan,))
+            return gltf_string
 
         gltf_data = json.loads(gltf_string)
         valid_meshes = []
@@ -59,14 +67,14 @@ class TimeSlider(object):
             mesh_timespan = self._getTimespan(gltf_data['meshes'][mesh], delimiter)
 
             if mesh_timespan:
-                print('mesh_timespan: start: ' + str(mesh_timespan[0]) + ' / end: ' + str(mesh_timespan[1]))
-                print('timespan_start      : ' + str(timespan_start) + '   / end: ' + str(timespan_end))
+                # print('mesh_timespan: start: ' + str(mesh_timespan[0]) + ' / end: ' + str(mesh_timespan[1]))
+                # print('timespan_start      : ' + str(timespan_start) + '   / end: ' + str(timespan_end))
 
                 if (mesh_timespan[0] > timespan_start and mesh_timespan[0] <= timespan_end) or (mesh_timespan[1] > timespan_start and mesh_timespan[1] <= timespan_end):
-                    print('added mesh')
+                    # print('added mesh')
                     valid_meshes.append(mesh)
-                else:
-                    print('no mesh added')
+                # else:
+                #     print('no mesh added')
 
         print('#valid_meshes: ' + str(len(valid_meshes)))
 
