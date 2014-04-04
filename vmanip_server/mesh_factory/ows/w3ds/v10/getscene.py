@@ -29,6 +29,8 @@ import Image
 import geocoord
 from bboxclip import clipPolylineBoundingBoxOnSphere, BoundingBox, v2dp
 from uuid import uuid4
+from django.conf import settings
+from os.path import join
 
 
 class W3DSGetSceneKVPDecoder(kvp.Decoder):
@@ -62,7 +64,7 @@ class W3DSGetSceneHandler(Component):
         max_level =  50 # maps to 255 in output texture
         exaggeration = 10 # multiplier for curtain height in visualization
         
-        # converter_path="/vagrant/shares/lib/collada2gltf"
+        # converter_path="/var/lib/gltf/collada2gltf"
         converter_path="/var/vmanip/lib/collada2gltf"
         
         decoder = W3DSGetSceneKVPDecoder(request.GET)
@@ -70,7 +72,23 @@ class W3DSGetSceneHandler(Component):
         print "Bounding box: ", decoder.boundingBox
         print "Time from ", decoder.time.low, " to ", decoder.time.high
         #pdb.set_trace()
-        
+
+        base_path = settings.PROJECT_DIR
+        layer = decoder.layer[0]
+
+        if layer == 'h2o_vol_demo':
+            model_filename = join(base_path, 'products/h2o_vol_demo/H2O.nii.gz')
+            print '[MeshFactory] delivered h2o_vol_demo product'
+            return (open(model_filename,"r"), 'text/plain')
+        elif layer == 'pressure_vol':
+            model_filename = join(base_path, 'products/pressure_vol_demo/Pressure.nii.gz')
+            print '[MeshFactory] delivered pressure_vol_demo product'
+            return (open(model_filename,"r"), 'text/plain')
+        elif layer == 'temperature_vol':
+            model_filename = join(base_path, 'products/temperature_vol_demo/Temperature.nii.gz')
+            print '[MeshFactory] delivered temperature_vol_demo product'
+            return (open(model_filename,"r"), 'text/plain')
+
         TextureResolutionPerTile = 256
         GeometryResolutionPerTile = 16
         MaximalCurtainsPerResponse = 32
