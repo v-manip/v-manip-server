@@ -73,19 +73,19 @@ class W3DSGetSceneHandler(Component):
         print "Time from ", decoder.time.low, " to ", decoder.time.high
         #pdb.set_trace()
 
-        base_path = settings.PROJECT_DIR
+        base_path = '/var/vmanip/data/'
         layer = decoder.layer[0]
 
         if layer == 'h2o_vol_demo':
-            model_filename = join(base_path, 'products/h2o_vol_demo/H2O.nii.gz')
+            model_filename = join(base_path, 'H2O.nii.gz')
             print '[MeshFactory] delivered h2o_vol_demo product'
             return (open(model_filename,"r"), 'text/plain')
         elif layer == 'pressure_vol':
-            model_filename = join(base_path, 'products/pressure_vol_demo/Pressure.nii.gz')
+            model_filename = join(base_path, 'Pressure.nii.gz')
             print '[MeshFactory] delivered pressure_vol_demo product'
             return (open(model_filename,"r"), 'text/plain')
         elif layer == 'temperature_vol':
-            model_filename = join(base_path, 'products/temperature_vol_demo/Temperature.nii.gz')
+            model_filename = join(base_path, 'Temperature.nii.gz')
             print '[MeshFactory] delivered temperature_vol_demo product'
             return (open(model_filename,"r"), 'text/plain')
 
