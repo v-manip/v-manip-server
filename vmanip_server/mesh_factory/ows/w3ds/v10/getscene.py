@@ -19,6 +19,7 @@ from eoxserver.services.ows.wms.util import (
 from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.geos import Polygon
 import numpy as np
+import shutil
 import sys
 from vmanip_server.mesh_factory.ows.w3ds.interfaces import SceneRendererInterface
 from collada import *
@@ -111,7 +112,8 @@ class W3DSGetSceneHandler(Component):
 
                 in_name=raster_item.location        # texture file name
                 # construct the texture names for conversion
-                (name, _) =os.path.splitext(os.path.basename(in_name)) # generate a unique identifier
+                name=str(uuid4()) # generate a REALLY unique identifier
+                
                 out_name=os.path.join(output_dir, name+'.png')
                 textureImage = Image.open(in_name)
                 (width, height) = textureImage.size
@@ -243,8 +245,8 @@ class W3DSGetSceneHandler(Component):
         mesh.scene = myscene
 
         id = str(uuid4())
-        out_file_dae=os.path.join(output_dir, id + '_test.dae')
-        out_file_gltf=os.path.join(output_dir, id + '_test.json')
+        out_file_dae=os.path.join(output_dir, id + '.dae')
+        out_file_gltf=os.path.join(output_dir, id + '.json')
         # now write the collada file to a temporary location
         mesh.write(out_file_dae)
 
@@ -260,12 +262,12 @@ class W3DSGetSceneHandler(Component):
         for of in outfiles:
             print "attaching file: ", of
             result_set.append(ResultFile(of, filename=os.path.split(of)[1], content_type="application/octet-stream"))
-#        pdb.set_trace()
 
         print "removing %s"%output_dir
         response=to_http_response(result_set)
-        os.removedirs(output_dir) # remove temp directory
-        return response
+        shutil.rmtree(output_dir) # remove temp directory
+        
+        return response # return response
 
-        #return "".join(response)
+        #return "".join(response) # return debug respoonse
 
