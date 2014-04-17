@@ -76,7 +76,7 @@ class TimeSlider(object):
                 # else:
                 #     print('no mesh added')
 
-        print('#valid_meshes: ' + str(len(valid_meshes)))
+        # print('#valid_meshes: ' + str(len(valid_meshes)))
 
         # FIXXME: this is hardcoded to 'node0' at the moment, as we know which geometry/names we are creating.
         # It would be reasonable to have this generalized!
@@ -89,7 +89,9 @@ class TimeSlider(object):
 
         name = mesh['name']
 
-        # example name: 5fc4421e277741fe937156cf99a88b12_Reflectivity_2013137095827_0019_proc-2013-05-17T11:21:04+00:00_2013-05-17T11:23:40+00:00
+        # example name: 6188a2fe-3a90-4b8b-93bf-612ccf659a4c-2013-05-17T11:10:34+00:00_2013-05-17T11:13:11+00:00
+        # Strip off the prepended UUID:
+        name = name[35:]
         idx = name.find('-')
 
         if idx != -1:
