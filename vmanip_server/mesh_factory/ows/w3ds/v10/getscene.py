@@ -16,6 +16,8 @@ from eoxserver.services.result import ResultFile, to_http_response
 from eoxserver.services.ows.wms.util import (
     lookup_layers, parse_bbox, parse_time, int_or_str
 )
+from eoxserver.services.subset import Subsets, Trim
+
 from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.geos import Polygon
 import numpy as np
@@ -95,11 +97,13 @@ class W3DSGetSceneHandler(Component):
             v2dp(decoder.boundingBox[2], decoder.boundingBox[3], 0.0)) / GeometryResolutionPerTile
         response.append( "minimal step size: %6.4f<br>" % minimalStepSize )
 
+        timesubset = Subsets([Trim("t", decoder.time.low, decoder.time.high)]) # trim to requested time interval
+
         # iterate over all "curtain" coverages
         for l in decoder.layer:
             layer = models.DatasetSeries.objects.get(identifier=l)
 
-            for coverage in models.CurtainCoverage.objects.filter(collections__in=[layer.pk]).filter(footprint__intersects=bbox):
+            for coverage in timesubset.filter(models.CurtainCoverage.objects.filter(collections__in=[layer.pk]).filter(footprint__intersects=bbox)):
 
                 # write the ID of the coverage
                 response.append("%s: " % coverage.identifier)
