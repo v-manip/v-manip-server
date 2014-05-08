@@ -32,7 +32,8 @@ from eoxserver.services.ows.interfaces import (
     ServiceHandlerInterface, GetServiceHandlerInterface
 )
 from eoxserver.core.decoders import kvp
-from vmanip_server.mesh_cache.mesh_cache import MeshCache
+from vmanip_server.mesh_cache.core.mesh_cache import MeshCache
+from vmanip_server.mesh_cache.core.time_slider import TimeSlider
 import logging
 
 
@@ -66,18 +67,16 @@ class W3DSGetTileHandler(Component):
         row = decoder.tilerow
         time = decoder.time
 
-        # magic cookie:
-        if decoder.tilelevel == 9999:
-            self.seed(layer, grid, range(0, 6), time)
-            return ('{ "status:" "finished seeding" }', 'application/json')
+        # magic seeding request:
+        if level == 9999:
+            logger.debug('[W3DSGetTileHandler::handle] started seeding for levels %s-%s:' % (col, row))
+            self.seed(layer, grid, range(col, row), time)
+            return ('{ "status:" "finished seeding of levels %s-%s" }' % (col, row), 'application/json')
 
         logger.debug('[W3DSGetTileHandler::handle] %s / %s / %s / %s / %s / %s' % (layer, grid, level, col, row, time))
 
         mesh_cache = MeshCache()
         tile_geo = mesh_cache.lookup(layer, grid, level, col, row, time)
-
-        # FIXXME: debugging only!
-        # tile_geo = False
 
         if not tile_geo:
             print 'No tile geometry available, requesting from source (MeshFactory) ...'
@@ -89,6 +88,11 @@ class W3DSGetTileHandler(Component):
                 raise Exception('Could not request data from source (MeshFactory)')
 
         logger.debug('[W3DSGetTileHandler::handle] returning tile_geo\n%s:' % (tile_geo,))
+
+        # FIXXME: Currently the TimeSlider object is doing the temporal trimming. The cache backend does not
+        # filter timewise yet (which is the clean solution). For now this is working as it should with the
+        # TimeSlider, the clean solution will be implemented at a later point in time.
+        tile_geo = TimeSlider().trim(tile_geo, time, '-')
 
         return (tile_geo, 'application/json')
 
