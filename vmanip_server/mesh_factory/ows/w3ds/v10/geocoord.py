@@ -2,7 +2,7 @@ import numpy as np
 import math
 
 coordrealEarthRadius = 6356752.3142
-coordradius = 1.0
+coordradius = 100.0
 coordheightScale = coordradius / coordrealEarthRadius
 
 
