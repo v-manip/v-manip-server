@@ -17,6 +17,7 @@ from eoxserver.services.ows.wms.util import (
     lookup_layers, parse_bbox, parse_time, int_or_str
 )
 from eoxserver.services.subset import Subsets, Trim
+from ngeo_browse_server.config.models import BrowseLayer
 
 from django.contrib.gis.geos import GEOSGeometry
 from django.contrib.gis.geos import Polygon
@@ -29,7 +30,8 @@ import os
 from collada_helper import trianglestrip, make_emissive_material
 #import Image
 from PIL import Image
-import geocoord
+from geocoord import *
+from GeoTIFF_2_NiFTi import *
 from bboxclip import clipPolylineBoundingBoxOnSphere, BoundingBox, v2dp
 from uuid import uuid4
 from django.conf import settings
@@ -74,10 +76,11 @@ class W3DSGetSceneHandler(Component):
         print "Layer: %s"%decoder.layer
         print "Bounding box: ", decoder.boundingBox
         print "Time from ", decoder.time.low, " to ", decoder.time.high
-        #pdb.set_trace()
 
         base_path = '/var/vmanip/data/'
         layer = decoder.layer[0]
+        bl = BrowseLayer.objects.get(pk=layer)
+        #print("contains curtains: %s, contains volumes: %s"%(bl.contains_vertical_curtains, bl.contains_volumes))
 
         if layer == 'h2o_vol_demo':
             model_filename = join(base_path, 'H2O.nii.gz')
@@ -113,181 +116,208 @@ class W3DSGetSceneHandler(Component):
         # use a minimal step size of (diagonal of bbox) / GeometryResolutionPerTile
         minimalStepSize = v2dp(decoder.boundingBox[0], decoder.boundingBox[1], 0.0).great_circle_distance(
             v2dp(decoder.boundingBox[2], decoder.boundingBox[3], 0.0)) / GeometryResolutionPerTile
-        response.append( "minimal step size: %6.4f<br>" % minimalStepSize )
+        #response.append( "minimal step size: %6.4f<br>" % minimalStepSize )
 
         timesubset = Subsets([Trim("t", decoder.time.low, decoder.time.high)]) # trim to requested time interval
 
-        # iterate over all "curtain" coverages
-        for l in decoder.layer:
-            layer = models.DatasetSeries.objects.get(identifier=l)
-
-            for coverage in timesubset.filter(models.CurtainCoverage.objects.filter(collections__in=[layer.pk]).filter(footprint__intersects=bbox)):
-
-                # write the ID of the coverage
-                response.append("%s: " % coverage.identifier)
-                print coverage
-
-                # retrieve the data item pointing to the raster data
-                raster_item = coverage.data_items.get(
-                    semantic__startswith="bands"
-                )
-
-                in_name=raster_item.location        # texture file name
-                # construct the texture names for conversion
-                name=str(uuid4()) # generate a REALLY unique identifier
+        if bl.contains_vertical_curtains:
+            # iterate over all "curtain" coverages
+            for l in decoder.layer:
+                layer = models.DatasetSeries.objects.get(identifier=l)
                 
-                out_name=os.path.join(output_dir, name+'.png')
-                textureImage = Image.open(in_name)
-#                textureImage = Image.open('/vagrant/shares/data/UV_map.png') # debug texture
-                print "Texture="+in_name
-                (width, height) = textureImage.size
-                if textureImage.mode == 'F':  # still a float image: (we expect 8bit)
-                    # map a subrange of a float image to an 8 bit PNG
-                    i = np.array(list(textureImage.getdata())).reshape(textureImage.size[::-1])
-                    g = np.divide(np.subtract(i, min_level), (max_level - min_level) / 255.0)
-                    g[g < 0] = 0
-                    textureImage = Image.fromarray(g.astype(np.uint8), 'L')
+                #pdb.set_trace()
 
-                # open it with GDAL to get the width/height of the raster
-                # ds = gdal.Open(raster_item.location)
-                # width=ds.RasterXSize
-                # height=ds.RasterYSize
+                for coverage in timesubset.filter(models.CurtainCoverage.objects.filter(collections__in=[layer.pk]).filter(footprint__intersects=bbox)):
 
-                # retrieve the data item pointing to the height values/levels
-                height_values_item = coverage.data_items.get(
-                    semantic__startswith="heightvalues"
-                )
+                    # write the ID of the coverage
+                    response.append("%s: " % coverage.identifier)
 
-                # retrieve the data item pointing to the coordinates
-                gcps_item = coverage.data_items.get(
-                    semantic__startswith="gcps"
-                )
+                    # retrieve the data item pointing to the raster data
+                    raster_item = coverage.data_items.get(
+                        semantic__startswith="bands"
+                    )
+
+                    in_name=raster_item.location        # texture file name
+                    # construct the texture names for conversion
+                    name=str(uuid4()) # generate a REALLY unique identifier
+                    
+                    out_name=os.path.join(output_dir, name+'.png')
+                    textureImage = Image.open(in_name)
+    #                textureImage = Image.open('/vagrant/shares/data/UV_map.png') # debug texture
+                    print "Texture="+in_name
+                    (width, height) = textureImage.size
+                    if textureImage.mode == 'F':  # still a float image: (we expect 8bit)
+                        # map a subrange of a float image to an 8 bit PNG
+                        i = np.array(list(textureImage.getdata())).reshape(textureImage.size[::-1])
+                        g = np.divide(np.subtract(i, min_level), (max_level - min_level) / 255.0)
+                        g[g < 0] = 0
+                        textureImage = Image.fromarray(g.astype(np.uint8), 'L')
+
+                    # open it with GDAL to get the width/height of the raster
+                    # ds = gdal.Open(raster_item.location)
+                    # width=ds.RasterXSize
+                    # height=ds.RasterYSize
+
+                    # retrieve the data item pointing to the height values/levels
+                    height_values_item = coverage.data_items.get(
+                        semantic__startswith="heightvalues"
+                    )
+
+                    # retrieve the data item pointing to the coordinates
+                    gcps_item = coverage.data_items.get(
+                        semantic__startswith="gcps"
+                    )
 
 
-                # load the json files to lists
-                with open(height_values_item.location) as f:
-                    height_values = json.load(f)
-                heightLevelsList=np.array(height_values)
+                    # load the json files to lists
+                    with open(height_values_item.location) as f:
+                        height_values = json.load(f)
+                    heightLevelsList=np.array(height_values)
 
-                with open(gcps_item.location) as f:
-                    gcps = json.load(f)
+                    with open(gcps_item.location) as f:
+                        gcps = json.load(f)
 
-                coords=np.array(gcps)
-                X=coords[:,0]
-                Y=coords[:,1]
-                # write out the coordinates
-                #print "%d coordinates (Xmin: %d, Xmax: %d, Ymin: %d, Ymax: %d), %d height levels (min: %d, max: %d)<br/>" % (len(gcps), X.min(), X.max(), Y.min(), Y.max(), len(height_values), heightLevelsList.min(), heightLevelsList.max())
+                    coords=np.array(gcps)
+                    X=coords[:,0]
+                    Y=coords[:,1]
+                    # write out the coordinates
+                    #print "%d coordinates (Xmin: %d, Xmax: %d, Ymin: %d, Ymax: %d), %d height levels (min: %d, max: %d)<br/>" % (len(gcps), X.min(), X.max(), Y.min(), Y.max(), len(height_values), heightLevelsList.min(), heightLevelsList.max())
 
-                # now build the geometry:
+                    # now build the geometry:
 
-                # stuff curtain piece footprint in polyline
-                polyline=list()
-                [x, y, u, v]  = gcps[0]
-                previous_position = v2dp(x, y, u)
-                polyline.append(v2dp(x, y, u))  # insert first ColRow entry
-                for [x, y, u, v] in gcps[1:-1]:  # loop over inner ColRows
-                    position = v2dp(x, y, u)
-                    if position.great_circle_distance(previous_position) >= minimalStepSize:
-                        polyline.append(position)  # append only ColRows with minimal step size
-                        previous_position = position
-                #[u, v, x, y] = UVXY[-1]
-                [x, y, u, v]  = gcps[-1]
-                polyline.append(v2dp(x, y, u))  # insert last ColRow entry
-                print "- %d nodes, length curtain = %6.3f" % (
-                    len(polyline), polyline[0].great_circle_distance(polyline[-1]))
+                    # stuff curtain piece footprint in polyline
+                    polyline=list()
+                    [x, y, u, v]  = gcps[0]
+                    previous_position = v2dp(x, y, u)
+                    polyline.append(v2dp(x, y, u))  # insert first ColRow entry
+                    for [x, y, u, v] in gcps[1:-1]:  # loop over inner ColRows
+                        position = v2dp(x, y, u)
+                        if position.great_circle_distance(previous_position) >= minimalStepSize:
+                            polyline.append(position)  # append only ColRows with minimal step size
+                            previous_position = position
+                    #[u, v, x, y] = UVXY[-1]
+                    [x, y, u, v]  = gcps[-1]
+                    polyline.append(v2dp(x, y, u))  # insert last ColRow entry
+                    print "- %d nodes, length curtain = %6.3f" % (
+                        len(polyline), polyline[0].great_circle_distance(polyline[-1]))
 
-                 # clip curtain on bounding box
-                polylist=clipPolylineBoundingBoxOnSphere(polyline, mybbox)
+                     # clip curtain on bounding box
+                    polylist=clipPolylineBoundingBoxOnSphere(polyline, mybbox)
 
-                u_min = sys.float_info.max
-                u_max = -sys.float_info.max
-                print " width=%d"%width
-                if len(polylist)>0:
-                    # create a unique material for each texture
-                    matnode = make_emissive_material(mesh, "Material-"+name, name+".png")
-                    # determine texture coordinate U range
-                    for pl in polylist:
-                        if len(pl)>0:
-                            # now build the geometry
-                            t=trianglestrip()
-                            for p in pl:
-                                u = p.u
-                                u_min = min (u_min, u)
-                                u_max = max (u_max, u)
-
-                    print "U: min=%f, max=%f"%(u_min, u_max)
-                    u_scale=u_max-u_min
-                    # convert all clipped polylines to triangle strips
-                    n=0
-                    if (u_scale>sys.float_info.min):
+                    u_min = sys.float_info.max
+                    u_max = -sys.float_info.max
+                    print " width=%d"%width
+                    if len(polylist)>0:
+                        # create a unique material for each texture
+                        matnode = make_emissive_material(mesh, "Material-"+name, name+".png")
+                        # determine texture coordinate U range
                         for pl in polylist:
                             if len(pl)>0:
                                 # now build the geometry
                                 t=trianglestrip()
                                 for p in pl:
-                                    x=p.x
-                                    y=p.y
-                                    u = ((p.u - u_min)/ u_scale)  # normalize u to range [0,1]
-                                    print ("U(%5.2f %5.2f) X, Y=(%5.2f,%5.2f), " % (p.u, u, x, y))
-                                    point = geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.min())))
-                                    t.add_point(point, [u, 0], [0, 0, 1])
-                                    point = geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.max() * exaggeration)))
-                                    t.add_point(point, [u, 1], [0, 0, 1])
-                                n=n+1
-                                # put everything in a geometry node
-                                geomnode = t.make_geometry(mesh, "Strip-%d-" % n + name,
-                                                            # return time interval as meta data appended in geometry id
-                                                           "%s-%s_%s"%(name, coverage.begin_time.isoformat(), coverage.end_time.isoformat()),
-                                                           matnode)  # all these pieces have the same material
-                                geom_nodes.append(geomnode)
+                                    u = p.u
+                                    u_min = min (u_min, u)
+                                    u_max = max (u_max, u)
 
-                    # now crop the image to the resolution we need:
-                    textureImage = textureImage.crop((int(round(u_min)), 0, int(round(u_max)) + 1, height))
+                        print "U: min=%f, max=%f"%(u_min, u_max)
+                        u_scale=u_max-u_min
+                        # convert all clipped polylines to triangle strips
+                        n=0
+                        if (u_scale>sys.float_info.min):
+                            for pl in polylist:
+                                if len(pl)>0:
+                                    # now build the geometry
+                                    t=trianglestrip()
+                                    for p in pl:
+                                        x=p.x
+                                        y=p.y
+                                        u = ((p.u - u_min)/ u_scale)  # normalize u to range [0,1]
+                                        print ("U(%5.2f %5.2f) X, Y=(%5.2f,%5.2f), " % (p.u, u, x, y))
+                                        point = geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.min())))
+                                        t.add_point(point, [u, 0], [0, 0, 1])
+                                        point = geocoord.fromGeoTo3D(np.array((x, y, heightLevelsList.max() * exaggeration)))
+                                        t.add_point(point, [u, 1], [0, 0, 1])
+                                    n=n+1
+                                    # put everything in a geometry node
+                                    geomnode = t.make_geometry(mesh, "Strip-%d-" % n + name,
+                                                                # return time interval as meta data appended in geometry id
+                                                               "%s-%s_%s"%(name, coverage.begin_time.isoformat(), coverage.end_time.isoformat()),
+                                                               matnode)  # all these pieces have the same material
+                                    geom_nodes.append(geomnode)
 
-                    # and resize it to the maximum allowed tile size
-                    (width, height) = textureImage.size
-                    if width > TextureResolutionPerTile:
-                        height = float(height) * float(TextureResolutionPerTile) / float(width)
-                        width = float(TextureResolutionPerTile)
+                        # now crop the image to the resolution we need:
+                        textureImage = textureImage.crop((int(round(u_min)), 0, int(round(u_max)) + 1, height))
 
-                    if height > TextureResolutionPerTile:
-                        height = float(TextureResolutionPerTile)
-                        width = float(width) * float(TextureResolutionPerTile) / float(height)
+                        # and resize it to the maximum allowed tile size
+                        (width, height) = textureImage.size
+                        if width > TextureResolutionPerTile:
+                            height = float(height) * float(TextureResolutionPerTile) / float(width)
+                            width = float(TextureResolutionPerTile)
 
-                    textureImage = textureImage.resize((int(round(width)), int(round(height))), Image.ANTIALIAS)
-                    textureImage.save(out_name, "PNG")
-                    print 'texture %s resized to w=%5.2f h=%5.2f'%(out_name, width, height)
+                        if height > TextureResolutionPerTile:
+                            height = float(TextureResolutionPerTile)
+                            width = float(width) * float(TextureResolutionPerTile) / float(height)
 
-        # put all the geometry nodes in a scene node
-        node = scene.Node("node0", children=geom_nodes)
-        myscene = scene.Scene("myscene", [node])
-        mesh.scenes.append(myscene)
-        mesh.scene = myscene
+                        textureImage = textureImage.resize((int(round(width)), int(round(height))), Image.ANTIALIAS)
+                        textureImage.save(out_name, "PNG")
+                        print 'texture %s resized to w=%5.2f h=%5.2f'%(out_name, width, height)
 
-        id = str(uuid4())
-        out_file_dae=os.path.join(output_dir, id + '.dae')
-        out_file_gltf=os.path.join(output_dir, id + '.json')
-        # now write the collada file to a temporary location
-        mesh.write(out_file_dae)
+            # put all the geometry nodes in a scene node
+            node = scene.Node("node0", children=geom_nodes)
+            myscene = scene.Scene("myscene", [node])
+            mesh.scenes.append(myscene)
+            mesh.scene = myscene
 
-        # and convert it to glTF
-        converter_output=os.popen(converter_path+" -f "+out_file_dae+" -o "+out_file_gltf).read()
-        response.append(converter_path+" -f "+out_file_dae+" -o "+out_file_gltf)
-        response.append("<h3>converter output</h3><pre>")
-        response.append(converter_output+"</pre>")
-#        os.remove(out_file_dae) # we do not need the collada file anymore
+            id = str(uuid4())
+            out_file_dae=os.path.join(output_dir, id + '.dae')
+            out_file_gltf=os.path.join(output_dir, id + '.json')
+            # now write the collada file to a temporary location
+            mesh.write(out_file_dae)
 
-        # now put all files generated by the converter in the multipart response
-        outfiles = glob.glob(output_dir + '/*.*')
-        for of in outfiles:
-            print "attaching file: ", of
-            result_set.append(ResultFile(of, filename=os.path.split(of)[1], content_type="application/octet-stream"))
+            # and convert it to glTF
+            converter_output=os.popen(converter_path+" -f "+out_file_dae+" -o "+out_file_gltf).read()
+            response.append(converter_path+" -f "+out_file_dae+" -o "+out_file_gltf)
+            response.append("<h3>converter output</h3><pre>")
+            response.append(converter_output+"</pre>")
+    #        os.remove(out_file_dae) # we do not need the collada file anymore
+
+            # now put all files generated by the converter in the multipart response
+            outfiles = glob.glob(output_dir + '/*.*')
+            for of in outfiles:
+                print "attaching file: ", of
+                result_set.append(ResultFile(of, filename=os.path.split(of)[1], content_type="application/octet-stream"))
+            response=to_http_response(result_set)
+
+
+        elif bl.contains_volumes:
+            print "Volumes!"
+            # iterate over all "volume" coverages
+            for l in decoder.layer:
+                layer = models.DatasetSeries.objects.get(identifier=l)
+                
+                #pdb.set_trace()
+
+                #for coverage in timesubset.filter(models.CubeCoverage.objects.filter(collections__in=[layer.pk]).filter(footprint__intersects=bbox)):
+                for coverage in models.CubeCoverage.objects.filter(collections__in=[layer.pk]).filter(footprint__intersects=bbox):
+
+                    # retrieve the data item pointing to the raster data
+                    raster_item = coverage.data_items.get(
+                        semantic__startswith="bands"
+                    )
+                    in_name=raster_item.location        # texture file name
+
+                    print("ID=%s, Name=%s " % (coverage.identifier, in_name))
+
+                    
+                id = str(uuid4())
+                out_file_nii=os.path.join(output_dir, id + '.nii.gz')
+                convert_GeoTIFF_2_NiFTi(in_name, out_file_nii)
+                #pdb.set_trace()
+                response = (open(out_file_nii,"r"), 'text/plain')
 
         print "removing %s"%output_dir
-        response=to_http_response(result_set)
         shutil.rmtree(output_dir) # remove temp directory
         
         return response # return response
-
-        #return "".join(response) # return debug respoonse
-
+            
