@@ -42,6 +42,7 @@ class W3DSGetSceneKVPDecoder(kvp.Decoder):
     #crs = kvp.Parameter()
     # look at getscene parameter
     boundingBox = kvp.Parameter(type=parse_bbox, num=1)
+    crs = kvp.Parameter(type=str, num=1)
     layer = kvp.Parameter(type=typelist(str, ","), num=1)
     time   = kvp.Parameter(type=parse_time, num="?")
     format = kvp.Parameter(type=typelist(str, ","), num="?")
@@ -308,6 +309,7 @@ class W3DSGetSceneHandler(Component):
         elif bl.contains_volumes:
             print "Volumes!"
             # iterate over all "volume" coverages
+            result = []
             for l in decoder.layer:
                 layer = models.DatasetSeries.objects.get(identifier=l)
                 
@@ -327,10 +329,11 @@ class W3DSGetSceneHandler(Component):
                     
                     id = str(uuid4())
                     out_file_nii=os.path.join(output_dir, id + '.nii.gz')
-                    convert_GeoTIFF_2_NiFTi(in_name, out_file_nii)
+                    convert_GeoTIFF_2_NiFTi(coverage, in_name, out_file_nii, decoder.boundingBox, decoder.crs)
                     #pdb.set_trace()
-                    response = (open(out_file_nii,"r"), 'text/plain')
+                    result.append(ResultFile(out_file_nii, content_type='application/x-nifti'))
 
+            response = to_http_response(result)
         print "removing %s"%output_dir
         shutil.rmtree(output_dir) # remove temp directory
         
