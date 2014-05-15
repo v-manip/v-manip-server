@@ -1,3 +1,5 @@
+
+import math
 import nibabel as nib
 import numpy as np
 from osgeo import gdal, gdalconst, osr
@@ -25,12 +27,13 @@ def convert_GeoTIFF_2_NiFTi(coverage, in_fname, out_fname, bbox, crs):
         #TODO
 
 
-    gt = dataset.GetGeoTransform()
+    #gt = dataset.GetGeoTransform()
 
     #origin x, offset x1, offset y1, origin y, offset x2, offset y2
 
     image_bbox = coverage.footprint.extent
-    res_x, res_y = coverage.resolution
+    res_x = (image_bbox[2] - image_bbox[0]) / dataset.RasterXSize
+    res_y = (image_bbox[1] - image_bbox[3]) / dataset.RasterYSize
 
 
     bbox[0] = max(image_bbox[0], bbox[0])
@@ -38,16 +41,18 @@ def convert_GeoTIFF_2_NiFTi(coverage, in_fname, out_fname, bbox, crs):
     bbox[2] = min(image_bbox[2], bbox[2])
     bbox[3] = min(image_bbox[3], bbox[3])
 
+
     r = (
-        int((bbox[0] - image_bbox[0]) / res_x),
-        int((bbox[1] - image_bbox[1]) / res_y),
-        int((bbox[2] - image_bbox[0]) / res_x),
-        int((bbox[3] - image_bbox[1]) / res_y)
+        int( math.floor((bbox[0] - image_bbox[0]) / res_x) ),
+        int( math.floor((bbox[3] - image_bbox[3]) / res_y) ),
+        int( math.ceil((bbox[2] - image_bbox[0]) / res_x) ),
+        int( math.ceil((bbox[1] - image_bbox[3]) / res_y) )
     )
 
+
     from ngeo_browse_server.config import models
+
     layer = models.Browse.objects.get(coverage_id=coverage.identifier).browse_layer
-    layer.radiometric_interval_min
 
     volume = np.array(dataset.GetRasterBand(1).ReadAsArray(r[0], r[1], r[2]-r[0], r[3]-r[1]))
     for i in range(2, dataset.RasterCount+1):
