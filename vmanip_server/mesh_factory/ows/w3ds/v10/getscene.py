@@ -315,8 +315,8 @@ class W3DSGetSceneHandler(Component):
                 
                 #pdb.set_trace()
 
-                #for coverage in timesubset.filter(models.CubeCoverage.objects.filter(collections__in=[layer.pk]).filter(footprint__intersects=bbox)):
-                for coverage in models.CubeCoverage.objects.filter(collections__in=[layer.pk]).filter(footprint__intersects=bbox):
+                for coverage in timesubset.filter(models.CubeCoverage.objects.filter(collections__in=[layer.pk]).filter(footprint__intersects=bbox)):
+                #for coverage in models.CubeCoverage.objects.filter(collections__in=[layer.pk]).filter(footprint__intersects=bbox):
 
                     # retrieve the data item pointing to the raster data
                     raster_item = coverage.data_items.get(
