@@ -45,7 +45,7 @@ class W3DSGetSceneKVPDecoder(kvp.Decoder):
     crs = kvp.Parameter(type=str, num=1)
     layer = kvp.Parameter(type=typelist(str, ","), num=1)
     time   = kvp.Parameter(type=parse_time, num="?")
-    format = kvp.Parameter(type=typelist(str, ","), num="?")
+    format = kvp.Parameter(type=str, num=1)
 
 
 # handler definition
@@ -82,7 +82,8 @@ class W3DSGetSceneHandler(Component):
         base_path = '/var/vmanip/data/'
         layer = decoder.layer[0]
         bl = BrowseLayer.objects.get(pk=layer)
-        #print("contains curtains: %s, contains volumes: %s"%(bl.contains_vertical_curtains, bl.contains_volumes))
+        print bl
+        print("contains curtains: %s, contains volumes: %s, format: %s"%(bl.contains_vertical_curtains, bl.contains_volumes, decoder.format))
 
         if layer == 'h2o_vol_demo':
             model_filename = join(base_path, 'H2O.nii.gz')
@@ -123,6 +124,7 @@ class W3DSGetSceneHandler(Component):
         timesubset = Subsets([Trim("t", decoder.time.low, decoder.time.high)]) # trim to requested time interval
 
         if bl.contains_vertical_curtains:
+            print "Curtain creation"
             # iterate over all "curtain" coverages
             for l in decoder.layer:
                 layer = models.DatasetSeries.objects.get(identifier=l)
@@ -334,6 +336,34 @@ class W3DSGetSceneHandler(Component):
                     result.append(ResultFile(out_file_nii, content_type='application/x-nifti'))
 
             response = to_http_response(result)
+
+        elif decoder.format == "model/nii-gz":
+            print "2D Volume creation"
+            # iterate over all "volume" coverages
+            result = []
+            for l in decoder.layer:
+                layer = models.DatasetSeries.objects.get(identifier=l)
+                
+                in_name_collection = []
+                id = str(uuid4())
+                out_file_nii=os.path.join(output_dir, id + '.nii.gz')
+
+                for coverage in timesubset.filter(models.RectifiedDataset.objects.filter(collections__in=[layer.pk]).filter(footprint__intersects=bbox)):
+
+                    #retrieve the data item pointing to the raster data
+                    raster_item = coverage.data_items.get(
+                        semantic__startswith="bands"
+                    )
+                    in_name=raster_item.location        # texture file name
+                    in_name_collection.append(in_name)
+
+                convert_collection_GeoTIFF_2_NiFTi(coverage, in_name_collection, out_file_nii, decoder.boundingBox, decoder.crs)
+                result.append(ResultFile(out_file_nii, content_type='application/x-nifti'))
+
+            response = to_http_response(result)
+
+
+
         print "removing %s"%output_dir
         shutil.rmtree(output_dir) # remove temp directory
         
