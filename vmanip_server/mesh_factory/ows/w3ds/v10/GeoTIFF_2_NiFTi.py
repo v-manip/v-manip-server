@@ -65,13 +65,13 @@ def convert_GeoTIFF_2_NiFTi(coverage, in_fname, out_fname, bbox, crs):
 
 
 
-def convert_collection_GeoTIFF_2_NiFTi (coverage, in_fname_collection, out_fname, bbox, crs):
+def convert_collection_GeoTIFF_2_NiFTi (coverage_collection, out_fname, bbox, crs):
 
     srid = crss.parseEPSGCode(crs, (crss.fromShortCode, crss.fromURN, crss.fromURL))
 
     raster_collection = []
 
-    for in_fname in in_fname_collection:
+    for coverage, in_fname in coverage_collection:
 
         dataset = gdal.Open(in_fname, gdalconst.GA_ReadOnly)
 
@@ -107,7 +107,7 @@ def convert_collection_GeoTIFF_2_NiFTi (coverage, in_fname_collection, out_fname
 
         raster_collection.append(dataset.GetRasterBand(1).ReadAsArray(r[0], r[1], r[2]-r[0], r[3]-r[1]))
 
-
+    
     volume = np.array(raster_collection[0])
     for i in range(1, len(raster_collection)):
         volume=np.dstack((volume, raster_collection[i]))

@@ -79,11 +79,17 @@ class W3DSGetSceneHandler(Component):
         print "Bounding box: ", decoder.boundingBox
         print "Time from ", decoder.time.low, " to ", decoder.time.high
 
+
         base_path = '/var/vmanip/data/'
         layer = decoder.layer[0]
-        bl = BrowseLayer.objects.get(pk=layer)
-        print bl
-        print("contains curtains: %s, contains volumes: %s, format: %s"%(bl.contains_vertical_curtains, bl.contains_volumes, decoder.format))
+
+        try:
+            bl = BrowseLayer.objects.get(pk=layer)
+        except BrowseLayer.DoesNotExist:
+            bl = False
+        
+
+        #print("contains curtains: %s, contains volumes: %s, format: %s"%(bl.contains_vertical_curtains, bl.contains_volumes, decoder.format))
 
         if layer == 'h2o_vol_demo':
             model_filename = join(base_path, 'H2O.nii.gz')
@@ -123,7 +129,7 @@ class W3DSGetSceneHandler(Component):
 
         timesubset = Subsets([Trim("t", decoder.time.low, decoder.time.high)]) # trim to requested time interval
 
-        if bl.contains_vertical_curtains:
+        if bl and bl.contains_vertical_curtains:
             print "Curtain creation"
             # iterate over all "curtain" coverages
             for l in decoder.layer:
@@ -308,7 +314,7 @@ class W3DSGetSceneHandler(Component):
             response=to_http_response(result_set)
 
 
-        elif bl.contains_volumes:
+        elif bl and bl.contains_volumes:
             print "Volumes!"
             # iterate over all "volume" coverages
             result = []
@@ -344,7 +350,8 @@ class W3DSGetSceneHandler(Component):
             for l in decoder.layer:
                 layer = models.DatasetSeries.objects.get(identifier=l)
                 
-                in_name_collection = []
+                coverage_collection = []
+
                 id = str(uuid4())
                 out_file_nii=os.path.join(output_dir, id + '.nii.gz')
 
@@ -355,9 +362,9 @@ class W3DSGetSceneHandler(Component):
                         semantic__startswith="bands"
                     )
                     in_name=raster_item.location        # texture file name
-                    in_name_collection.append(in_name)
+                    coverage_collection.append((coverage, in_name))
 
-                convert_collection_GeoTIFF_2_NiFTi(coverage, in_name_collection, out_file_nii, decoder.boundingBox, decoder.crs)
+                convert_collection_GeoTIFF_2_NiFTi(coverage_collection, out_file_nii, decoder.boundingBox, decoder.crs)
                 result.append(ResultFile(out_file_nii, content_type='application/x-nifti'))
 
             response = to_http_response(result)
