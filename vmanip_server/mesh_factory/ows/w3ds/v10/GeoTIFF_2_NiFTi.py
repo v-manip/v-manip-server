@@ -4,7 +4,9 @@ import nibabel as nib
 import numpy as np
 from osgeo import gdal, gdalconst, osr
 
+from eoxserver.core.util.rect import Rect
 from eoxserver.resources.coverages import crss
+from eoxserver.contrib.vrt import VRTBuilder
 
 def convert_GeoTIFF_2_NiFTi(coverage, in_fname, out_fname, bbox, crs):
 
@@ -71,9 +73,22 @@ def convert_collection_GeoTIFF_2_NiFTi (coverage_collection, out_fname, bbox, cr
 
     raster_collection = []
 
-    for coverage, in_fname in coverage_collection:
+    dataset = gdal.Open(coverage_collection[0][1], gdalconst.GA_ReadOnly)
+    image_bbox = coverage_collection[0][0].footprint.extent
+    res_x = (image_bbox[2] - image_bbox[0]) / dataset.RasterXSize
+    res_y = (image_bbox[1] - image_bbox[3]) / dataset.RasterYSize
 
-        dataset = gdal.Open(in_fname, gdalconst.GA_ReadOnly)
+    size_x = abs(int((bbox[2]-bbox[0])/res_x))
+    size_y = abs(int((bbox[3]-bbox[1])/res_y))
+
+
+    builder = VRTBuilder(size_x, size_y, len(coverage_collection))
+
+    for i, (coverage, in_fname) in enumerate(coverage_collection, start=1):
+
+        data = np.zeros((size_y, size_x), dtype=np.uint8)
+        
+        dataset = gdal.Open(str(in_fname), gdalconst.GA_ReadOnly)
 
         in_sr = osr.SpatialReference()
         in_sr.ImportFromEPSG(4326) # TODO: get real projection value
@@ -88,29 +103,28 @@ def convert_collection_GeoTIFF_2_NiFTi (coverage_collection, out_fname, bbox, cr
             p1 = ct.TransformPoint(bbox[2], bbox[3])
 
         image_bbox = coverage.footprint.extent
-        res_x = (image_bbox[2] - image_bbox[0]) / dataset.RasterXSize
-        res_y = (image_bbox[1] - image_bbox[3]) / dataset.RasterYSize
+        res_x = abs(image_bbox[2] - image_bbox[0]) / dataset.RasterXSize
+        res_y = abs(image_bbox[1] - image_bbox[3]) / dataset.RasterYSize
 
 
-        bbox[0] = max(image_bbox[0], bbox[0])
-        bbox[1] = max(image_bbox[1], bbox[1])
-        bbox[2] = min(image_bbox[2], bbox[2])
-        bbox[3] = min(image_bbox[3], bbox[3])
-
-
-        r = (
-            int( math.floor((bbox[0] - image_bbox[0]) / res_x) ),
-            int( math.floor((bbox[3] - image_bbox[3]) / res_y) ),
-            int( math.ceil((bbox[2] - image_bbox[0]) / res_x) ),
-            int( math.ceil((bbox[1] - image_bbox[3]) / res_y) )
+        dst_rect = (
+            int( math.floor((image_bbox[0] - bbox[0]) / res_x) ), # x offset
+            int( math.floor((bbox[3] - image_bbox[3]) / res_y) ), # y offset
+            dataset.RasterXSize, # x size
+            dataset.RasterYSize  # y size
         )
 
-        raster_collection.append(dataset.GetRasterBand(1).ReadAsArray(r[0], r[1], r[2]-r[0], r[3]-r[1]))
 
+        builder.add_simple_source(i, str(in_fname), 1, src_rect=(0, 0, dataset.RasterXSize, dataset.RasterYSize), dst_rect=dst_rect)
+
+
+    volume = builder.dataset.GetRasterBand(1).ReadAsArray()
+    for i in range(2, len(coverage_collection) + 1):
+        volume = np.dstack((volume, builder.dataset.GetRasterBand(i).ReadAsArray()))
+
+    #scale = np.array([1.0,float(size_x)/size_y,1.0,1.0])
+    #affine = np.diag(scale)
+    #img = nib.Nifti1Image(volume, affine)
     
-    volume = np.array(raster_collection[0])
-    for i in range(1, len(raster_collection)):
-        volume=np.dstack((volume, raster_collection[i]))
-
     img = nib.Nifti1Image(volume, np.eye(4))
     img.to_filename(out_fname)
