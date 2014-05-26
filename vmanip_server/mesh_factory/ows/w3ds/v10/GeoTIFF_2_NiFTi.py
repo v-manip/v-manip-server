@@ -85,8 +85,6 @@ def convert_collection_GeoTIFF_2_NiFTi (coverage_collection, out_fname, bbox, cr
     builder = VRTBuilder(size_x, size_y, len(coverage_collection))
 
     for i, (coverage, in_fname) in enumerate(coverage_collection, start=1):
-
-        data = np.zeros((size_y, size_x), dtype=np.uint8)
         
         dataset = gdal.Open(str(in_fname), gdalconst.GA_ReadOnly)
 
