@@ -39,7 +39,7 @@ class MeshCache(object):
     def __init__(self):
         # FIXXME: get parameters from config!
         self.cache = MapCacheSQLite('/var/www/cache')
-        self.source = MeshFactoryClient('http://localhost:8000')
+        self.source = MeshFactoryClient('http://localhost/browse/ows')
         self.gltf_folder = '/var/www/cache/gltf/'
 
         try:
