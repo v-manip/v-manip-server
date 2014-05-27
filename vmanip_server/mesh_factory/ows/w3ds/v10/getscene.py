@@ -287,9 +287,9 @@ class W3DSGetSceneHandler(Component):
             # now write the collada file to a temporary location
             mesh.write(out_file_dae)
             
-            print("Format = '%s'"%decoder.format[0])
+            print("Format = '%s'"%decoder.format)
             
-            if decoder.format[0] == "model/obj":
+            if decoder.format == "model/obj":
                 # and convert it to obj
                 converter_output=os.popen(obj_converter_path+out_file_dae+" "+out_file_obj).read()
                 print("convert from %s to %s:"%(out_file_dae, out_file_obj))
@@ -310,7 +310,18 @@ class W3DSGetSceneHandler(Component):
             outfiles = glob.glob(output_dir + '/*.*')
             for of in outfiles:
                 print "attaching file: ", of
-                result_set.append(ResultFile(of, filename=os.path.split(of)[1], content_type="application/octet-stream"))
+
+                contenttype = ""
+                if of.endswith('.obj'):
+                    contenttype = "model/obj"
+                elif of.endswith('.mtl'):
+                    contenttype = "text/plain"
+                elif of.endswith('.png'):
+                    contenttype = "image/png"
+                else:
+                    contenttype = "application/octet-stream"
+
+                result_set.append(ResultFile(of, filename=os.path.split(of)[1], content_type=contenttype))
             response=to_http_response(result_set)
 
 
