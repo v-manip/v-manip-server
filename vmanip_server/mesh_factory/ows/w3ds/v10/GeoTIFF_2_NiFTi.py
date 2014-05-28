@@ -62,7 +62,7 @@ def convert_GeoTIFF_2_NiFTi(coverage, in_fname, out_fname, bbox, crs):
 
     volume = np.clip(volume, layer.radiometric_interval_min, layer.radiometric_interval_max)
 
-    scale = np.array([4,4,8])
+    scale = np.array([4,4,8,1])
     affine = np.diag(scale)
     img = nib.Nifti1Image(volume, affine)
 
@@ -124,7 +124,7 @@ def convert_collection_GeoTIFF_2_NiFTi (coverage_collection, out_fname, bbox, cr
     for i in range(2, len(coverage_collection) + 1):
         volume = np.dstack((volume, builder.dataset.GetRasterBand(i).ReadAsArray()))
 
-    scale = np.array([4,4,16])
+    scale = np.array([4,4,16,1])
     affine = np.diag(scale)
     img = nib.Nifti1Image(volume, affine)
     
