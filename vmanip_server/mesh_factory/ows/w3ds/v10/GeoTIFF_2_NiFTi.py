@@ -64,7 +64,7 @@ def convert_GeoTIFF_2_NiFTi(coverage, in_fname, out_fname, bbox, crs):
 
 
 
-    scale = np.array([res_x*10,res_y*10,8,1])
+    scale = np.array([res_x*20,res_y*20,4,1])
     affine = np.diag(scale)
     img = nib.Nifti1Image(volume, affine)
 
