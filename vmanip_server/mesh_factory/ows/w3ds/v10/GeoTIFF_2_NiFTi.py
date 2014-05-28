@@ -126,9 +126,10 @@ def convert_collection_GeoTIFF_2_NiFTi (coverage_collection, out_fname, bbox, cr
     for i in range(2, len(coverage_collection) + 1):
         volume = np.dstack((volume, builder.dataset.GetRasterBand(i).ReadAsArray()))
 
+
     offset = random.uniform(0.00000000000000, 0.00000000000001)
 
-    scale = np.array([res_y*200+offset,res_x*200+offset,res_x*150+offset,1])
+    scale = np.array([res_y*800+offset,res_x*800+offset,res_x*2400+offset,1])   
     affine = np.diag(scale)
     img = nib.Nifti1Image(volume, affine)
     
