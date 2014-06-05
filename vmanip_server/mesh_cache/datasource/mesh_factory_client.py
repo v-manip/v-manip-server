@@ -52,7 +52,7 @@ class MeshFactoryClient(object):
         #time = '2013-05-17T11:10:34.000Z/2013-05-17T11:26:18.000Z'
 
         # FIXXME: those parameters should be configurable!
-        baseurl = self.host + '/ows?service=W3DS&request=GetScene&version=1.0.0&crs=WGS84&format=model/gltf'
+        baseurl = self.host + '?service=W3DS&request=GetScene&version=1.0.0&crs=WGS84&format=model/gltf'
         url = '{0}&layer={1}&boundingBox={2}&time={3}'.format(baseurl, layer, bbox_str, time)
 
         # logger.debug('URL: %s' % (url,))
