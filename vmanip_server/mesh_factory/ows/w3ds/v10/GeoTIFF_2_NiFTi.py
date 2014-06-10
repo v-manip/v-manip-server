@@ -56,15 +56,26 @@ def convert_GeoTIFF_2_NiFTi(coverage, in_fname, out_fname, bbox, crs):
 
     layer = models.Browse.objects.get(coverage_id=coverage.identifier).browse_layer
 
-    volume = np.array(dataset.GetRasterBand(1).ReadAsArray(r[0], r[1], r[2]-r[0], r[3]-r[1]))
+    if ('GOME-2' in coverage.identifier or 'NPL3Merged' in coverage.identifier or 'REAN' in coverage.identifier):
+        scale = 1000000
+        scale_y = res_y
+        scale_x = res_x
+        scale_z = 5
+    else:
+        scale = 1
+        scale_y = res_y*200
+        scale_x = res_x*200
+        scale_z = 5
+
+    volume = np.array(dataset.GetRasterBand(1).ReadAsArray(r[0], r[1], r[2]-r[0], r[3]-r[1])*scale )
     for i in range(2, dataset.RasterCount+1):
-        volume=np.dstack((volume, dataset.GetRasterBand(i).ReadAsArray(r[0], r[1], r[2]-r[0], r[3]-r[1])))
+        volume=np.dstack((volume, dataset.GetRasterBand(i).ReadAsArray(r[0], r[1], r[2]-r[0], r[3]-r[1])*scale ))
 
     volume = np.clip(volume, layer.radiometric_interval_min, layer.radiometric_interval_max)
 
     offset = random.uniform(0.00000000000000, 0.00000000000001)
 
-    scale = np.array([res_y*200+offset,res_x*200+offset,res_x*150+offset,1])
+    scale = np.array([scale_y+offset,scale_x+offset,scale_z+offset,1])
     affine = np.diag(scale)
     img = nib.Nifti1Image(volume, affine)
 
