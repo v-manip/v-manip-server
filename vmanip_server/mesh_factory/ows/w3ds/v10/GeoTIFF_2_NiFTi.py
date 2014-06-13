@@ -56,7 +56,7 @@ def convert_GeoTIFF_2_NiFTi(coverage, in_fname, out_fname, bbox, crs):
 
     layer = models.Browse.objects.get(coverage_id=coverage.identifier).browse_layer
 
-    if ('GOME-2' in coverage.identifier or 'NPL3Merged' in coverage.identifier or 'REAN' in coverage.identifier):
+    if ('GOME-2' in coverage.identifier or 'NPL3Merged' in coverage.identifier or 'BASCOE' in coverage.identifier or 'LPL2_MIPAS' in coverage.identifier):
         scale = 1000000
         scale_y = res_y
         scale_x = res_x
