@@ -67,9 +67,27 @@ def convert_GeoTIFF_2_NiFTi(coverage, in_fname, out_fname, bbox, crs):
         scale_x = res_x*200
         scale_z = 5
 
-    volume = np.array(dataset.GetRasterBand(1).ReadAsArray(r[0], r[1], r[2]-r[0], r[3]-r[1])*scale )
-    for i in range(2, dataset.RasterCount+1):
-        volume=np.dstack((volume, dataset.GetRasterBand(i).ReadAsArray(r[0], r[1], r[2]-r[0], r[3]-r[1])*scale ))
+
+    if ('GOME-2' not in coverage.identifier or 'LPL2_MIPAS' not in coverage.identifier):
+        volume = np.array(dataset.GetRasterBand(1).ReadAsArray(r[0], r[1], r[2]-r[0], r[3]-r[1])*scale )
+        for i in range(2, dataset.RasterCount+1):
+            volume=np.dstack((volume, dataset.GetRasterBand(i).ReadAsArray(r[0], r[1], r[2]-r[0], r[3]-r[1])*scale ))
+
+    elif 'GOME-2' in coverage.identifier:
+        layers = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        volume = np.array(dataset.GetRasterBand(2).ReadAsArray(r[0], r[1], r[2]-r[0], r[3]-r[1])*scale )
+        for i in layers:
+            volume=np.dstack((volume, dataset.GetRasterBand(i).ReadAsArray(r[0], r[1], r[2]-r[0], r[3]-r[1])*scale ))
+    
+    elif 'LPL2_MIPAS' in coverage.identifier:
+        layers = [9, 13, 17, 19, 21, 24, 27, 28, 29, 31, 33, 34, 35, 37]
+        volume = np.array(dataset.GetRasterBand(4).ReadAsArray(r[0], r[1], r[2]-r[0], r[3]-r[1])*scale )
+        for i in layers:
+            volume=np.dstack((volume, dataset.GetRasterBand(i).ReadAsArray(r[0], r[1], r[2]-r[0], r[3]-r[1])*scale ))
+
+    
+    
+
 
     volume = np.clip(volume, layer.radiometric_interval_min, layer.radiometric_interval_max)
 
