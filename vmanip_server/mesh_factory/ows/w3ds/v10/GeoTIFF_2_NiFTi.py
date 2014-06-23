@@ -117,7 +117,7 @@ def convert_collection_GeoTIFF_2_NiFTi (coverage_collection, out_fname, bbox, cr
     size_y = abs(int((bbox[3]-bbox[1])/res_y))
 
 
-    builder = VRTBuilder(size_x, size_y, len(coverage_collection), coverage_collection[0].range_type.bands.all()[0].data_type)
+    builder = VRTBuilder(size_x, size_y, len(coverage_collection), coverage_collection[0][0].range_type.bands.all()[0].data_type)
 
     for i, (coverage, in_fname) in enumerate(coverage_collection, start=1):
         
